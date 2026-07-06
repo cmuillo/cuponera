@@ -15,7 +15,9 @@ function showToast(msg, type = 'success') {
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
+  // Tomar solo los primeros 10 chars (YYYY-MM-DD) por si viene como ISO completo
+  const clean = String(dateStr).substring(0, 10);
+  const d = new Date(clean + 'T00:00:00');
   return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
