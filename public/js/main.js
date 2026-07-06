@@ -67,12 +67,12 @@ function closeSidebar() {
 // ---- ROUTER ----
 
 const PAGES = {
-  generar: { title: 'Generar Cupón', render: PageGenerar.render },
-  historial: { title: 'Historial de Cupones', render: PageHistorial.render },
-  reportes: { title: 'Reportes', render: PageReportes.render },
-  tombola: { title: 'Tómbola', render: PageTombola.render },
-  sorteos: { title: 'Configuración de Sorteos', render: PageSorteos.render },
-  cuenta: { title: 'Mi Cuenta', render: PageCuenta.render },
+  generar:  { title: 'Generar Cupón',            render: (c) => PageGenerar.render(c) },
+  historial:{ title: 'Historial de Cupones',     render: (c) => PageHistorial.render(c) },
+  reportes: { title: 'Reportes',                 render: (c) => PageReportes.render(c) },
+  tombola:  { title: 'Tómbola',                  render: (c) => PageTombola.render(c) },
+  sorteos:  { title: 'Configuración de Sorteos', render: (c) => PageSorteos.render(c) },
+  cuenta:   { title: 'Mi Cuenta',                render: (c) => PageCuenta.render(c) },
 };
 
 async function navigate(hash) {
