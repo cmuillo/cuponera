@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cuponera</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎟️</text></svg>" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- SIDEBAR OVERLAY (mobile) -->
+  <div id="sidebarOverlay" class="sidebar-overlay d-none" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <nav id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">🎟️</span>
+      <span class="sidebar-title">Cuponera</span>
+      <button class="btn-close-sidebar d-md-none" onclick="closeSidebar()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <ul class="sidebar-nav">
+      <li>
+        <a href="#generar" class="nav-link" data-page="generar">
+          <i class="bi bi-plus-circle-fill"></i> Generar Cupón
+        </a>
+      </li>
+      <li>
+        <a href="#historial" class="nav-link" data-page="historial">
+          <i class="bi bi-clock-history"></i> Historial
+        </a>
+      </li>
+      <li>
+        <a href="#reportes" class="nav-link" data-page="reportes">
+          <i class="bi bi-bar-chart-fill"></i> Reportes
+        </a>
+      </li>
+      <li>
+        <a href="#tombola" class="nav-link" data-page="tombola">
+          <i class="bi bi-stars"></i> Tómbola
+        </a>
+      </li>
+      <li class="nav-divider"></li>
+      <li>
+        <a href="#sorteos" class="nav-link" data-page="sorteos">
+          <i class="bi bi-gear-fill"></i> Configuración
+        </a>
+      </li>
+      <li>
+        <a href="#cuenta" class="nav-link" data-page="cuenta">
+          <i class="bi bi-shield-lock-fill"></i> Mi Cuenta
+        </a>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <span id="sidebarUser" class="text-muted small"><i class="bi bi-person-circle me-1"></i></span>
+      <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="logout()">
+        <i class="bi bi-box-arrow-right"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-wrapper">
+    <!-- TOP NAV (mobile) -->
+    <header class="topbar d-md-none">
+      <button class="btn btn-link text-dark p-0" onclick="openSidebar()">
+        <i class="bi bi-list fs-4"></i>
+      </button>
+      <span id="topbarTitle" class="fw-bold ms-3">Cuponera</span>
+      <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="logout()">
+        <i class="bi bi-box-arrow-right"></i>
+      </button>
+    </header>
+
+    <!-- PAGE CONTENT -->
+    <main id="pageContent" class="page-content">
+      <div class="d-flex justify-content-center align-items-center h-100">
+        <div class="spinner-border text-primary"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast de notificación -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+    <div id="appToast" class="toast align-items-center border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="toastMsg"></div>
+        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/page-sorteos.js"></script>
+  <script src="/js/page-generar.js"></script>
+  <script src="/js/page-historial.js"></script>
+  <script src="/js/page-reportes.js"></script>
+  <script src="/js/page-tombola.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

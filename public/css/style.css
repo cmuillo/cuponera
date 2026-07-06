@@ -1,0 +1,224 @@
+/* ========================================
+   CUPONERA — Estilos principales
+   ======================================== */
+
+:root {
+  --primary: #4f46e5;
+  --primary-dark: #3730a3;
+  --primary-light: #eef2ff;
+  --sidebar-w: 240px;
+  --topbar-h: 56px;
+}
+
+body {
+  background: #f1f5f9;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ---- SIDEBAR ---- */
+.sidebar {
+  position: fixed;
+  top: 0; left: 0;
+  width: var(--sidebar-w);
+  height: 100vh;
+  background: #1e1b4b;
+  display: flex;
+  flex-direction: column;
+  z-index: 1040;
+  transition: transform .3s ease;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1rem .75rem;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  gap: .5rem;
+}
+.sidebar-logo { font-size: 1.6rem; }
+.sidebar-title { color: #fff; font-weight: 700; font-size: 1.1rem; flex: 1; }
+.btn-close-sidebar { background: none; border: none; color: rgba(255,255,255,.7); font-size: 1.1rem; cursor: pointer; }
+
+.sidebar-nav {
+  list-style: none;
+  padding: .75rem 0;
+  margin: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+.sidebar-nav li { margin: 0; }
+.sidebar-nav .nav-link {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .65rem 1.25rem;
+  color: rgba(255,255,255,.75);
+  text-decoration: none;
+  font-size: .925rem;
+  border-radius: 0;
+  transition: background .15s, color .15s;
+}
+.sidebar-nav .nav-link:hover { background: rgba(255,255,255,.08); color: #fff; }
+.sidebar-nav .nav-link.active { background: var(--primary); color: #fff; font-weight: 600; }
+.sidebar-nav .nav-link i { font-size: 1rem; width: 20px; text-align: center; }
+.nav-divider { height: 1px; background: rgba(255,255,255,.1); margin: .5rem 1rem; }
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  padding: .75rem 1rem;
+  border-top: 1px solid rgba(255,255,255,.1);
+  color: rgba(255,255,255,.6);
+  font-size: .85rem;
+  gap: .5rem;
+}
+
+/* SIDEBAR OVERLAY (mobile) */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1039;
+}
+
+/* ---- TOPBAR (mobile) ---- */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--topbar-h);
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  z-index: 1030;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+
+/* ---- MAIN WRAPPER ---- */
+.main-wrapper {
+  margin-left: var(--sidebar-w);
+  min-height: 100vh;
+}
+.page-content {
+  padding: 2rem;
+  min-height: 100vh;
+}
+
+/* ---- CARDS ---- */
+.card {
+  border: none;
+  border-radius: .875rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+}
+.card-header {
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: .875rem .875rem 0 0 !important;
+  font-weight: 600;
+  padding: 1rem 1.25rem;
+}
+
+/* ---- PAGE TITLE ---- */
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e1b4b;
+  margin-bottom: 1.5rem;
+}
+.page-title i { margin-right: .4rem; color: var(--primary); }
+
+/* ---- WHATSAPP BUTTON ---- */
+.btn-whatsapp {
+  background: #25d366;
+  color: #fff;
+  border: none;
+}
+.btn-whatsapp:hover { background: #1da851; color: #fff; }
+
+/* ---- BADGE SORTEO ---- */
+.badge-activo { background: #dcfce7; color: #16a34a; font-size: .75rem; font-weight: 600; padding: .3em .7em; border-radius: 1em; }
+.badge-inactivo { background: #fee2e2; color: #dc2626; font-size: .75rem; font-weight: 600; padding: .3em .7em; border-radius: 1em; }
+
+/* ---- STATS CARD ---- */
+.stat-card {
+  background: #fff;
+  border-radius: .875rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+  text-align: center;
+}
+.stat-card .stat-num { font-size: 2.2rem; font-weight: 700; color: var(--primary); line-height: 1; }
+.stat-card .stat-label { font-size: .85rem; color: #64748b; margin-top: .25rem; }
+
+/* ---- TOMBOLA ---- */
+#wheelContainer {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+#wheelCanvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.wheel-pointer {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 2rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.4));
+  z-index: 10;
+}
+#winnerBanner {
+  border-radius: .875rem;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(79,70,229,.35);
+}
+#winnerBanner .winner-code {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 767.98px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .main-wrapper {
+    margin-left: 0;
+  }
+  .page-content {
+    padding: 1rem;
+    padding-top: calc(var(--topbar-h) + 1rem);
+  }
+  .page-title { font-size: 1.25rem; }
+}
+
+/* ---- TABLA RESPONSIVE ---- */
+.table-responsive { border-radius: .5rem; }
+.table th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+.table td { vertical-align: middle; font-size: .9rem; }
+
+/* ---- FORM FOCUS ---- */
+.form-control:focus, .form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 .2rem rgba(79,70,229,.2);
+}
+
+/* ---- EMPTY STATE ---- */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #94a3b8;
+}
+.empty-state i { font-size: 3rem; display: block; margin-bottom: .75rem; }
