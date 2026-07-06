@@ -19,11 +19,11 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/** Normaliza celular para wa.me (agrega código de país 57 si es colombiano sin +) */
+/** Normaliza celular para wa.me (agrega código de país +506 si es costarricense sin +) */
 function normalizePhone(cel) {
   const digits = cel.replace(/\D/g, '');
-  if (digits.startsWith('57') && digits.length >= 12) return digits;
-  if (digits.length === 10) return '57' + digits;
+  if (digits.startsWith('506') && digits.length >= 11) return digits;
+  if (digits.length === 8) return '506' + digits;
   return digits;
 }
 

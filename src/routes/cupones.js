@@ -60,7 +60,7 @@ router.post('/', async (req, res) => {
   }
   // Validar celular: solo dígitos, +, espacios, guiones, min 7 chars
   const cleanCelular = celular.replace(/\s/g, '');
-  if (!/^[\d+\-]{7,20}$/.test(cleanCelular)) {
+  if (!/^[\d+\-]{8,15}$/.test(cleanCelular)) {
     return res.status(400).json({ error: 'Formato de celular inválido.' });
   }
 

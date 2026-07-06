@@ -44,9 +44,9 @@ const PageGenerar = {
                   <label class="form-label fw-semibold">Celular *</label>
                   <div class="input-group">
                     <span class="input-group-text">📱</span>
-                    <input type="tel" id="generarCelular" class="form-control" placeholder="Ej: 3001234567" maxlength="20" required />
+                    <input type="tel" id="generarCelular" class="form-control" placeholder="Ej: 88001234" maxlength="20" required />
                   </div>
-                  <div class="form-text">Para Colombia: 10 dígitos. El código de país (+57) se agrega automáticamente.</div>
+                  <div class="form-text">Para Costa Rica: 8 dígitos. El código de país (+506) se agrega automáticamente.</div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100 py-2" id="generarBtn" ${sorteos.length === 0 ? 'disabled' : ''}>
                   <i class="bi bi-ticket-perforated me-1"></i>Generar Cupón
