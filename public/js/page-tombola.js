@@ -34,6 +34,17 @@ const PageTombola = {
                 </select>
               </div>
               <div class="mb-3">
+                <label class="form-label fw-semibold">Duración del giro</label>
+                <div class="btn-group w-100" role="group" aria-label="Duración">
+                  <input type="radio" class="btn-check" name="tombDur" id="dur3" value="3" />
+                  <label class="btn btn-outline-secondary" for="dur3">3 seg</label>
+                  <input type="radio" class="btn-check" name="tombDur" id="dur6" value="6" checked />
+                  <label class="btn btn-outline-secondary" for="dur6">6 seg</label>
+                  <input type="radio" class="btn-check" name="tombDur" id="dur9" value="9" />
+                  <label class="btn btn-outline-secondary" for="dur9">9 seg</label>
+                </div>
+              </div>
+              <div class="mb-3">
                 <label class="form-label fw-semibold">Modo de sorteo</label>
                 <div class="btn-group w-100" role="group">
                   <input type="radio" class="btn-check" name="tombMode" id="modeUnico" value="unico" checked onchange="PageTombola.setMode('unico')" />
@@ -303,7 +314,8 @@ const PageTombola = {
     document.getElementById('btnGirar').disabled = true;
 
     const startAngle = PageTombola.angle;
-    const duration = 4000 + Math.random() * 1500; // 4-5.5s
+    const selectedSec = parseInt(document.querySelector('input[name="tombDur"]:checked')?.value || '6');
+    const duration = selectedSec * 1000;
     const startTime = performance.now();
 
     function easeOut(t) {
