@@ -129,7 +129,7 @@ const PageTombola = {
                             onclick="PageTombola.confirmarGanador()">
                       <i class="bi bi-check-circle me-1"></i>Confirmar ganador
                     </button>
-                    <button class="btn btn-light" onclick="PageTombola.girar()">
+                    <button class="btn btn-light" id="btnVolverGirar" onclick="PageTombola.girar()">
                       <i class="bi bi-arrow-repeat me-1"></i>Volver a girar
                     </button>
                   </div>
@@ -297,29 +297,34 @@ const PageTombola = {
     PageTombola.winner = disponibles[winnerIdx];
 
     const n = disponibles.length;
-    const segAngle = (2 * Math.PI) / n;
+    const TAU = 2 * Math.PI;
+    const segAngle = TAU / n;
 
-    // Ángulo en que debe parar el segmento ganador bajo el puntero (top = -π/2)
-    // El puntero está en la parte superior. El segmento i empieza en rotationAngle + i*segAngle - π/2
-    // Queremos que el CENTRO del segmento ganador esté en el tope (ángulo 0 desde -π/2)
-    // => rotationAngle + winnerIdx*segAngle - π/2 + segAngle/2 = -π/2 (módulo 2π)
-    // => rotationAngle = -winnerIdx*segAngle - segAngle/2 + kπ (múltiplos de 2π)
-
+    // Ángulo destino del segmento ganador (absoluto)
     const targetAngle = -(winnerIdx * segAngle + segAngle / 2);
-    // Agregar vueltas completas (5-8 vueltas) para la animación
-    const extraSpins = (5 + Math.floor(Math.random() * 4)) * 2 * Math.PI;
-    const finalAngle = targetAngle - extraSpins;
+
+    // --- FIX: calcular delta RELATIVO al ángulo actual ---
+    // Normalizar ambos ángulos a [0, 2π) para calcular la diferencia
+    const startAngle = PageTombola.angle;
+    const startNorm  = ((startAngle  % TAU) + TAU) % TAU;
+    const targetNorm = ((targetAngle % TAU) + TAU) % TAU;
+    let delta = targetNorm - startNorm; // diferencia en [0, 2π)
+    if (delta > 0) delta -= TAU;        // convertir a negativo (giro en dirección horaria)
+
+    // Vueltas extra (5-8 completas) + ajuste fino al ganador
+    const extraSpins = (5 + Math.floor(Math.random() * 4)) * TAU;
+    const finalAngle = startAngle + delta - extraSpins;
+    // Resultado: siempre gira entre 5 y 9 vueltas completas desde cualquier posición
 
     PageTombola.spinning = true;
     document.getElementById('btnGirar').disabled = true;
 
-    const startAngle = PageTombola.angle;
     const selectedSec = parseInt(document.querySelector('input[name="tombDur"]:checked')?.value || '6');
     const duration = selectedSec * 1000;
     const startTime = performance.now();
 
     function easeOut(t) {
-      return 1 - Math.pow(1 - t, 4); // quartic ease-out
+      return 1 - Math.pow(1 - t, 4);
     }
 
     function animate(now) {
@@ -333,6 +338,8 @@ const PageTombola = {
       if (t < 1) {
         requestAnimationFrame(animate);
       } else {
+        // Normalizar el ángulo acumulado para evitar números enormes en giros futuros
+        PageTombola.angle = ((finalAngle % TAU) + TAU) % TAU;
         PageTombola.spinning = false;
         document.getElementById('btnGirar').disabled = false;
         PageTombola.showWinner();
@@ -365,11 +372,13 @@ const PageTombola = {
 
     // Mostrar botón confirmar en modo múltiple
     const btnConf = document.getElementById('btnConfirmar');
+    const btnVolver = document.getElementById('btnVolverGirar');
     if (PageTombola.mode === 'multiple') {
       btnConf.classList.remove('d-none');
     } else {
       btnConf.classList.add('d-none');
     }
+    if (btnVolver) btnVolver.classList.remove('d-none');
 
     document.getElementById('winnerBanner').classList.remove('d-none');
     document.getElementById('winnerBanner').scrollIntoView({ behavior: 'smooth', block: 'center' });
