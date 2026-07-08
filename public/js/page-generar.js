@@ -216,20 +216,3 @@ const PageGenerar = {
     document.getElementById('generarSorteo').focus();
   },
 };
-
-      `👤 ${escHtml(cupon.nombre_persona || 'Sin nombre')} &nbsp;|&nbsp; 🪪 ${escHtml(cupon.cedula)} &nbsp;|&nbsp; 📱 ${escHtml(cupon.celular)}`;
-
-    const waText = buildCuponWaText(cupon);
-    document.getElementById('btnWaResult').href = buildWaLink(cupon.celular, waText);
-
-    document.getElementById('cuponResultCol').classList.remove('d-none');
-    document.getElementById('generarForm').reset();
-    showToast('¡Cupón generado exitosamente!', 'success');
-  },
-
-  nuevoForm() {
-    document.getElementById('cuponResultCol').classList.add('d-none');
-    document.getElementById('generarForm').reset();
-    document.getElementById('generarSorteo').focus();
-  },
-};
