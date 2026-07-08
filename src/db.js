@@ -50,6 +50,14 @@ async function initDB() {
 
     await client.query('COMMIT');
 
+    // Migraciones no destructivas (columnas nuevas)
+    await pool.query(`
+      ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS monto_minimo INTEGER DEFAULT 0
+    `);
+    await pool.query(`
+      ALTER TABLE cupones ADD COLUMN IF NOT EXISTS monto_venta INTEGER DEFAULT 0
+    `);
+
     // Crear usuario admin si no existe
     const adminUser = process.env.ADMIN_USER || 'admin';
     const adminPass = process.env.ADMIN_PASSWORD || 'Admin123!';

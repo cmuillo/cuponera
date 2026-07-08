@@ -28,18 +28,20 @@ router.get('/', async (req, res) => {
 
 // POST /api/sorteos
 router.post('/', async (req, res) => {
-  const { nombre, descripcion, fecha_sorteo, activo } = req.body;
+  const { nombre, descripcion, fecha_sorteo, activo, monto_minimo } = req.body;
   if (!nombre || !fecha_sorteo) {
     return res.status(400).json({ error: 'Nombre y fecha del sorteo son requeridos.' });
   }
   if (nombre.length > 255) {
     return res.status(400).json({ error: 'El nombre no puede superar 255 caracteres.' });
   }
+  const montoMin = parseInt(monto_minimo) || 0;
+  if (montoMin < 0) return res.status(400).json({ error: 'El monto mínimo no puede ser negativo.' });
   try {
     const result = await pool.query(
-      `INSERT INTO sorteos (nombre, descripcion, fecha_sorteo, activo)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false]
+      `INSERT INTO sorteos (nombre, descripcion, fecha_sorteo, activo, monto_minimo)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -51,15 +53,17 @@ router.post('/', async (req, res) => {
 // PUT /api/sorteos/:id
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { nombre, descripcion, fecha_sorteo, activo } = req.body;
+  const { nombre, descripcion, fecha_sorteo, activo, monto_minimo } = req.body;
   if (!nombre || !fecha_sorteo) {
     return res.status(400).json({ error: 'Nombre y fecha del sorteo son requeridos.' });
   }
+  const montoMin = parseInt(monto_minimo) || 0;
+  if (montoMin < 0) return res.status(400).json({ error: 'El monto mínimo no puede ser negativo.' });
   try {
     const result = await pool.query(
-      `UPDATE sorteos SET nombre=$1, descripcion=$2, fecha_sorteo=$3, activo=$4, updated_at=NOW()
-       WHERE id=$5 RETURNING *`,
-      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, id]
+      `UPDATE sorteos SET nombre=$1, descripcion=$2, fecha_sorteo=$3, activo=$4, monto_minimo=$5, updated_at=NOW()
+       WHERE id=$6 RETURNING *`,
+      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Sorteo no encontrado.' });

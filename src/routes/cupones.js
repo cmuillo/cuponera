@@ -54,34 +54,56 @@ router.get('/', async (req, res) => {
 
 // POST /api/cupones
 router.post('/', async (req, res) => {
-  const { sorteo_id, celular, cedula, nombre_persona } = req.body;
+  const { sorteo_id, celular, cedula, nombre_persona, monto_venta } = req.body;
   if (!sorteo_id || !celular || !cedula) {
     return res.status(400).json({ error: 'Sorteo, celular y cédula son requeridos.' });
   }
-  // Validar celular: solo dígitos, +, espacios, guiones, min 7 chars
   const cleanCelular = celular.replace(/\s/g, '');
   if (!/^[\d+\-]{8,15}$/.test(cleanCelular)) {
     return res.status(400).json({ error: 'Formato de celular inválido.' });
   }
 
   try {
-    // Verificar que el sorteo existe y está activo
+    // Verificar que el sorteo existe
     const sorteoResult = await pool.query('SELECT * FROM sorteos WHERE id = $1', [sorteo_id]);
     if (sorteoResult.rows.length === 0) {
       return res.status(404).json({ error: 'Sorteo no encontrado.' });
     }
-
-    const codigo = await generateUniqueCouponCode(sorteo_id);
-    const result = await pool.query(
-      `INSERT INTO cupones (codigo, sorteo_id, celular, cedula, nombre_persona)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [codigo, sorteo_id, cleanCelular, cedula.trim(), nombre_persona?.trim() || null]
-    );
-
-    // Devolver con info del sorteo
-    const cupon = result.rows[0];
     const sorteo = sorteoResult.rows[0];
-    res.status(201).json({ ...cupon, sorteo_nombre: sorteo.nombre, fecha_sorteo: sorteo.fecha_sorteo, sorteo_descripcion: sorteo.descripcion });
+
+    // Calcular cantidad de cupones según monto
+    const montoVenta = parseInt(monto_venta) || 0;
+    const montoMinimo = parseInt(sorteo.monto_minimo) || 0;
+    let cantidad = 1;
+    if (montoMinimo > 0 && montoVenta > 0) {
+      cantidad = Math.floor(montoVenta / montoMinimo);
+      if (cantidad < 1) {
+        return res.status(400).json({
+          error: `El monto de venta (₡${montoVenta.toLocaleString()}) es menor al monto mínimo por cupón (₡${montoMinimo.toLocaleString()}).`
+        });
+      }
+    }
+
+    // Crear N cupones
+    const creados = [];
+    const nombreLimpio = nombre_persona?.trim() || null;
+    for (let i = 0; i < cantidad; i++) {
+      const codigo = await generateUniqueCouponCode(sorteo_id);
+      const result = await pool.query(
+        `INSERT INTO cupones (codigo, sorteo_id, celular, cedula, nombre_persona, monto_venta)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [codigo, sorteo_id, cleanCelular, cedula.trim(), nombreLimpio, montoVenta]
+      );
+      creados.push({
+        ...result.rows[0],
+        sorteo_nombre: sorteo.nombre,
+        fecha_sorteo: sorteo.fecha_sorteo,
+        sorteo_descripcion: sorteo.descripcion,
+        monto_minimo: montoMinimo,
+      });
+    }
+
+    res.status(201).json(creados);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al crear el cupón.' });

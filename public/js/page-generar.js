@@ -1,20 +1,20 @@
 /**
- * page-generar.js — Generación de cupones
+ * page-generar.js — Generación de cupones (con monto de venta y multi-cupón)
  */
 const PageGenerar = {
-  lastCupon: null,
+  sorteos: [],
 
   async render(container) {
-    // Cargar sorteos activos
-    let sorteos = [];
     try {
-      sorteos = await API.get('/api/sorteos?activo=true');
-    } catch (e) { /* se maneja abajo */ }
+      PageGenerar.sorteos = await API.get('/api/sorteos?activo=true');
+    } catch (e) { PageGenerar.sorteos = []; }
 
+    const sorteos = PageGenerar.sorteos;
     const sorteoOptions = sorteos.length === 0
       ? '<option value="">— No hay sorteos activos —</option>'
       : ['<option value="">Seleccione un sorteo...</option>',
-          ...sorteos.map(s => `<option value="${s.id}" data-nombre="${escHtml(s.nombre)}" data-fecha="${s.fecha_sorteo}" data-desc="${escHtml(s.descripcion||'')}">${escHtml(s.nombre)} — ${formatDate(s.fecha_sorteo)}</option>`)
+          ...sorteos.map(s =>
+            `<option value="${s.id}" data-monto="${s.monto_minimo || 0}">${escHtml(s.nombre)} — ${formatDate(s.fecha_sorteo)}</option>`)
         ].join('');
 
     container.innerHTML = `
@@ -28,7 +28,7 @@ const PageGenerar = {
               <form id="generarForm" autocomplete="off">
                 <div class="mb-3">
                   <label class="form-label fw-semibold">Sorteo *</label>
-                  <select id="generarSorteo" class="form-select" required>
+                  <select id="generarSorteo" class="form-select" required onchange="PageGenerar.onSorteoChange()">
                     ${sorteoOptions}
                   </select>
                 </div>
@@ -40,13 +40,29 @@ const PageGenerar = {
                   <label class="form-label fw-semibold">Cédula *</label>
                   <input type="text" id="generarCedula" class="form-control" placeholder="Ej: 12345678" maxlength="25" required />
                 </div>
-                <div class="mb-4">
+                <div class="mb-3">
                   <label class="form-label fw-semibold">Celular *</label>
                   <div class="input-group">
                     <span class="input-group-text">📱</span>
                     <input type="tel" id="generarCelular" class="form-control" placeholder="Ej: 88001234" maxlength="20" required />
                   </div>
                   <div class="form-text">Para Costa Rica: 8 dígitos. El código de país (+506) se agrega automáticamente.</div>
+                </div>
+                <!-- Monto de venta (visible solo si el sorteo tiene monto mínimo) -->
+                <div class="mb-3 d-none" id="montoVentaGroup">
+                  <label class="form-label fw-semibold">Monto de venta *</label>
+                  <div class="input-group">
+                    <span class="input-group-text">₡</span>
+                    <input type="number" id="generarMonto" class="form-control" min="0" step="500"
+                           placeholder="Ej: 45000" oninput="PageGenerar.updatePreview()" />
+                  </div>
+                  <!-- Preview de cupones -->
+                  <div id="cuponesPreview" class="mt-2 d-none">
+                    <div class="alert alert-info py-2 mb-0 d-flex align-items-center gap-2">
+                      <i class="bi bi-ticket-perforated-fill fs-5"></i>
+                      <span id="previewText"></span>
+                    </div>
+                  </div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100 py-2" id="generarBtn" ${sorteos.length === 0 ? 'disabled' : ''}>
                   <i class="bi bi-ticket-perforated me-1"></i>Generar Cupón
@@ -60,8 +76,8 @@ const PageGenerar = {
         <div class="col-md-8 col-lg-6 d-none" id="cuponResultCol">
           <div class="card border-0" style="background: linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff;">
             <div class="card-body p-4 text-center">
-              <div class="mb-2" style="font-size:.9rem;opacity:.85;">🎟️ CUPÓN GENERADO</div>
-              <div id="resCodigo" style="font-size:2.8rem;font-weight:800;letter-spacing:.1em;line-height:1.1;"></div>
+              <div id="resHeader" class="mb-2" style="font-size:.95rem;opacity:.85;font-weight:600;"></div>
+              <div id="resCodigos"></div>
               <div id="resSorteo" class="mt-2" style="font-size:1rem;opacity:.9;"></div>
               <div id="resFecha" style="font-size:.85rem;opacity:.75;"></div>
               <hr style="border-color:rgba(255,255,255,.3);" />
@@ -86,6 +102,40 @@ const PageGenerar = {
     });
   },
 
+  onSorteoChange() {
+    const sel = document.getElementById('generarSorteo');
+    const opt = sel.options[sel.selectedIndex];
+    const montoMin = parseInt(opt?.dataset?.monto || '0');
+    const group = document.getElementById('montoVentaGroup');
+    const montoInput = document.getElementById('generarMonto');
+    if (montoMin > 0) {
+      group.classList.remove('d-none');
+      montoInput.setAttribute('required', 'required');
+    } else {
+      group.classList.add('d-none');
+      montoInput.removeAttribute('required');
+      document.getElementById('cuponesPreview').classList.add('d-none');
+    }
+    PageGenerar.updatePreview();
+  },
+
+  updatePreview() {
+    const sel = document.getElementById('generarSorteo');
+    const opt = sel.options[sel.selectedIndex];
+    const montoMin = parseInt(opt?.dataset?.monto || '0');
+    const montoVenta = parseInt(document.getElementById('generarMonto')?.value || '0');
+    const preview = document.getElementById('cuponesPreview');
+    const previewText = document.getElementById('previewText');
+    if (!montoMin || !montoVenta) { preview.classList.add('d-none'); return; }
+    const cantidad = Math.floor(montoVenta / montoMin);
+    if (cantidad < 1) {
+      previewText.innerHTML = `<strong class="text-danger">Monto insuficiente.</strong> Se necesitan al menos ₡${montoMin.toLocaleString()} por cupón.`;
+    } else {
+      previewText.innerHTML = `Se generarán <strong>${cantidad} cupón${cantidad > 1 ? 'es' : ''}</strong> (₡${montoMin.toLocaleString()} c/u)`;
+    }
+    preview.classList.remove('d-none');
+  },
+
   async crearCupon() {
     const alertEl = document.getElementById('generarAlert');
     alertEl.classList.add('d-none');
@@ -94,15 +144,15 @@ const PageGenerar = {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando...';
 
     try {
-      const cupon = await API.post('/api/cupones', {
+      const cupones = await API.post('/api/cupones', {
         sorteo_id: parseInt(document.getElementById('generarSorteo').value),
         celular: document.getElementById('generarCelular').value.trim(),
         cedula: document.getElementById('generarCedula').value.trim(),
         nombre_persona: document.getElementById('generarNombre').value.trim() || null,
+        monto_venta: parseInt(document.getElementById('generarMonto')?.value || '0'),
       });
 
-      PageGenerar.lastCupon = cupon;
-      PageGenerar.showResult(cupon);
+      PageGenerar.showResult(cupones);
     } catch (err) {
       alertEl.className = 'alert alert-danger';
       alertEl.textContent = err.message;
@@ -113,11 +163,60 @@ const PageGenerar = {
     }
   },
 
-  showResult(cupon) {
-    document.getElementById('resCodigo').textContent = cupon.codigo;
-    document.getElementById('resSorteo').textContent = `📋 ${cupon.sorteo_nombre}`;
-    document.getElementById('resFecha').textContent = `📅 Sorteo: ${formatDate(cupon.fecha_sorteo)}`;
+  showResult(cupones) {
+    // cupones es siempre un array
+    const c = cupones[0];
+    const cantidad = cupones.length;
+
+    document.getElementById('resHeader').textContent =
+      `🎟️ ${cantidad === 1 ? 'CUPÓN GENERADO' : `${cantidad} CUPONES GENERADOS`}`;
+
+    // Mostrar códigos
+    if (cantidad === 1) {
+      document.getElementById('resCodigos').innerHTML =
+        `<div style="font-size:2.8rem;font-weight:800;letter-spacing:.1em;line-height:1.1;">${escHtml(c.codigo)}</div>`;
+    } else {
+      const grid = cupones.map(cu =>
+        `<span class="badge bg-white text-primary fw-bold" style="font-size:1rem;letter-spacing:.05em;">${escHtml(cu.codigo)}</span>`
+      ).join(' ');
+      document.getElementById('resCodigos').innerHTML =
+        `<div class="d-flex flex-wrap gap-2 justify-content-center my-2">${grid}</div>`;
+    }
+
+    document.getElementById('resSorteo').textContent = `📋 ${c.sorteo_nombre}`;
+    document.getElementById('resFecha').textContent = `📅 Sorteo: ${formatDate(c.fecha_sorteo)}`;
     document.getElementById('resDatos').innerHTML =
+      `👤 ${escHtml(c.nombre_persona || 'Sin nombre')} &nbsp;|&nbsp; 🪪 ${escHtml(c.cedula)} &nbsp;|&nbsp; 📱 ${escHtml(c.celular)}`;
+
+    // Mensaje WhatsApp con todos los códigos
+    const codigos = cupones.map(cu => cu.codigo).join('\n• ');
+    const waText = `🎟️ *¡Tus cupones han sido registrados!*\n\n` +
+      `📋 Sorteo: *${c.sorteo_nombre}*\n` +
+      `📅 Fecha del sorteo: ${formatDate(c.fecha_sorteo)}\n` +
+      `🎫 ${cantidad === 1 ? 'Número de cupón' : `Tus ${cantidad} cupones`}:\n• ${codigos}\n` +
+      `👤 Titular: ${c.nombre_persona || 'Participante'}\n` +
+      `🪪 Cédula: ${c.cedula}\n` +
+      `📱 Celular: ${c.celular}\n` +
+      (c.sorteo_descripcion ? `\nℹ️ ${c.sorteo_descripcion}\n` : '') +
+      `\n¡Mucha suerte! 🍀`;
+
+    document.getElementById('btnWaResult').href = buildWaLink(c.celular, waText);
+    document.getElementById('cuponResultCol').classList.remove('d-none');
+    document.getElementById('generarForm').reset();
+    document.getElementById('montoVentaGroup').classList.add('d-none');
+    document.getElementById('cuponesPreview').classList.add('d-none');
+    showToast(`¡${cantidad} cupón${cantidad > 1 ? 'es generados' : ' generado'} exitosamente!`, 'success');
+  },
+
+  nuevoForm() {
+    document.getElementById('cuponResultCol').classList.add('d-none');
+    document.getElementById('generarForm').reset();
+    document.getElementById('montoVentaGroup').classList.add('d-none');
+    document.getElementById('cuponesPreview').classList.add('d-none');
+    document.getElementById('generarSorteo').focus();
+  },
+};
+
       `👤 ${escHtml(cupon.nombre_persona || 'Sin nombre')} &nbsp;|&nbsp; 🪪 ${escHtml(cupon.cedula)} &nbsp;|&nbsp; 📱 ${escHtml(cupon.celular)}`;
 
     const waText = buildCuponWaText(cupon);

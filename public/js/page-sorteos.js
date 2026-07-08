@@ -26,6 +26,16 @@ const PageSorteos = {
                   <label class="form-label fw-semibold">Fecha del sorteo *</label>
                   <input type="date" id="sorteoFecha" class="form-control" required />
                 </div>
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Monto mínimo por cupón
+                    <span class="text-muted fw-normal small">(colones, 0 = sin límite)</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">₡</span>
+                    <input type="number" id="sorteoMontoMin" class="form-control" min="0" step="500" placeholder="Ej: 10000" />
+                  </div>
+                  <div class="form-text">Monto de compra necesario para obtener 1 cupón.</div>
+                </div>
                 <div class="mb-4 form-check form-switch">
                   <input class="form-check-input" type="checkbox" id="sorteoActivo" checked />
                   <label class="form-check-label" for="sorteoActivo">Sorteo activo</label>
@@ -85,8 +95,7 @@ const PageSorteos = {
           <div class="flex-fill">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <span class="fw-semibold">${escHtml(s.nombre)}</span>
-              <span class="${s.activo ? 'badge-activo' : 'badge-inactivo'}">${s.activo ? 'Activo' : 'Inactivo'}</span>
-            </div>
+              <span class="${s.activo ? 'badge-activo' : 'badge-inactivo'}">${s.activo ? 'Activo' : 'Inactivo'}</span>              ${s.monto_minimo > 0 ? `<span class="badge bg-light text-dark border"><i class="bi bi-coin me-1"></i>₡${parseInt(s.monto_minimo).toLocaleString()} mínimo</span>` : ''}            </div>
             <div class="text-muted small mt-1">
               <i class="bi bi-calendar3 me-1"></i>${formatDate(s.fecha_sorteo)}
               ${s.descripcion ? `<span class="ms-2 text-truncate d-inline-block" style="max-width:200px" title="${escHtml(s.descripcion)}"><i class="bi bi-text-left me-1"></i>${escHtml(s.descripcion)}</span>` : ''}
@@ -118,6 +127,7 @@ const PageSorteos = {
       descripcion: document.getElementById('sorteoDesc').value.trim(),
       fecha_sorteo: document.getElementById('sorteoFecha').value,
       activo: document.getElementById('sorteoActivo').checked,
+      monto_minimo: parseInt(document.getElementById('sorteoMontoMin').value) || 0,
     };
     try {
       if (id) {
@@ -146,6 +156,7 @@ const PageSorteos = {
       document.getElementById('sorteoDesc').value = s.descripcion || '';
       document.getElementById('sorteoFecha').value = s.fecha_sorteo ? s.fecha_sorteo.split('T')[0] : '';
       document.getElementById('sorteoActivo').checked = s.activo;
+      document.getElementById('sorteoMontoMin').value = s.monto_minimo || 0;
       document.getElementById('sorteoFormTitle').textContent = 'Editar Sorteo';
       document.getElementById('sorteoSubmitBtn').innerHTML = '<i class="bi bi-check2 me-1"></i>Guardar Cambios';
       document.getElementById('sorteoCancelBtn').classList.remove('d-none');
