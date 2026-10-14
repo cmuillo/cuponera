@@ -2,6 +2,8 @@
  * page-reportes.js — Estadísticas y PDF
  */
 const PageReportes = {
+  data: [],
+
   async render(container) {
     let sorteos = [];
     try { sorteos = await API.get('/api/sorteos'); } catch(e) {}
@@ -17,17 +19,22 @@ const PageReportes = {
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-2 align-items-end">
-            <div class="col-sm-4">
+            <div class="col-sm-3">
               <label class="form-label small fw-semibold">Sorteo</label>
               <select id="rptSorteo" class="form-select form-select-sm">${sorteoOpts}</select>
             </div>
-            <div class="col-sm-4">
+            <div class="col-sm-3">
               <label class="form-label small fw-semibold">Buscar por cédula o celular</label>
               <input type="text" id="rptBuscar" class="form-control form-control-sm" placeholder="Buscar..." />
             </div>
             <div class="col-sm-2">
               <button class="btn btn-primary btn-sm w-100" onclick="PageReportes.loadStats()">
                 <i class="bi bi-search me-1"></i>Buscar
+              </button>
+            </div>
+            <div class="col-sm-2">
+              <button class="btn btn-success btn-sm w-100" id="btnExcel" onclick="PageReportes.exportarExcel()" title="Exportar el detalle a Excel">
+                <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
               </button>
             </div>
             <div class="col-sm-2">
@@ -38,7 +45,8 @@ const PageReportes = {
           </div>
           <div class="form-text mt-1">
             <i class="bi bi-info-circle me-1"></i>
-            El botón <strong>PDF Cupones</strong> genera la hoja de cupones para imprimir y tómbola física (requiere seleccionar un sorteo).
+            <strong>Exportar Excel</strong> incluye la casilla de acompañante y el conteo de personas a asistir.
+            <strong>PDF Cupones</strong> genera la hoja de cupones para imprimir y tómbola física (requiere seleccionar un sorteo).
           </div>
         </div>
       </div>
@@ -59,14 +67,14 @@ const PageReportes = {
         </div>
         <div class="col-6 col-md-3">
           <div class="stat-card">
-            <div class="stat-num" id="statMax">—</div>
-            <div class="stat-label">Máx. cupones/persona</div>
+            <div class="stat-num" id="statAcompanantes">—</div>
+            <div class="stat-label">Con acompañante</div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="stat-card">
-            <div class="stat-num" id="statAvg">—</div>
-            <div class="stat-label">Promedio cupones</div>
+            <div class="stat-num" id="statAsistentes">—</div>
+            <div class="stat-label">Personas a asistir</div>
           </div>
         </div>
       </div>
@@ -102,17 +110,14 @@ const PageReportes = {
 
     try {
       const data = await API.get(`/api/reportes/estadisticas?${params.toString()}`);
+      PageReportes.data = data;
 
       // Calcular stats globales
-      const totalCupones = data.reduce((a, b) => a + parseInt(b.total_cupones), 0);
-      const personas = data.length;
-      const max = data.length > 0 ? Math.max(...data.map(d => parseInt(d.total_cupones))) : 0;
-      const avg = personas > 0 ? (totalCupones / personas).toFixed(1) : 0;
-
-      document.getElementById('statTotalCupones').textContent = totalCupones;
-      document.getElementById('statPersonas').textContent = personas;
-      document.getElementById('statMax').textContent = max;
-      document.getElementById('statAvg').textContent = avg;
+      const totales = PageReportes.calcTotales(data);
+      document.getElementById('statTotalCupones').textContent = totales.totalCupones;
+      document.getElementById('statPersonas').textContent = totales.personas;
+      document.getElementById('statAcompanantes').textContent = totales.acompanantes;
+      document.getElementById('statAsistentes').textContent = totales.asistentes;
 
       if (data.length === 0) {
         el.innerHTML = '<div class="empty-state"><i class="bi bi-graph-up"></i>No hay datos para mostrar.</div>';
@@ -128,6 +133,7 @@ const PageReportes = {
                 <th>Cédula</th>
                 <th>Celular</th>
                 <th>Sorteo</th>
+                <th class="text-center">Acompañante</th>
                 <th class="text-center">Cupones</th>
                 <th>Códigos</th>
                 <th>Acciones</th>
@@ -146,7 +152,15 @@ const PageReportes = {
                     <small class="text-muted">${formatDate(row.fecha_sorteo)}</small>
                   </td>
                   <td class="text-center">
+                    ${row.acompanante
+                      ? '<span class="badge bg-success"><i class="bi bi-people-fill me-1"></i>Sí</span>'
+                      : '<span class="text-muted">No</span>'}
+                  </td>
+                  <td class="text-center">
                     <span class="badge bg-primary rounded-pill fs-6">${row.total_cupones}</span>
+                    ${parseInt(row.cupones_pendientes) > 0
+                      ? `<br><span class="badge bg-warning text-dark mt-1" title="Cupones pendientes de confirmar pago">${row.cupones_pendientes} por pagar</span>`
+                      : ''}
                   </td>
                   <td>
                     <div class="d-flex flex-wrap gap-1">
@@ -171,6 +185,20 @@ const PageReportes = {
     }
   },
 
+  /** Totales agregados, incluyendo la cantidad de personas que asistirán. */
+  calcTotales(data) {
+    const totalCupones = data.reduce((a, b) => a + parseInt(b.total_cupones), 0);
+    const personas = data.length;
+    const acompanantes = data.filter(d => d.acompanante).length;
+    return {
+      totalCupones,
+      personas,
+      acompanantes,
+      asistentes: personas + acompanantes,
+      pendientes: data.reduce((a, b) => a + parseInt(b.cupones_pendientes || 0), 0),
+    };
+  },
+
   buildResumenWa(row) {
     const codigos = (row.codigos || []).join('\n• ');
     return `📊 *Resumen de cupones — ${row.sorteo_nombre}*\n\n` +
@@ -179,6 +207,52 @@ const PageReportes = {
       `📱 Celular: ${row.celular}\n\n` +
       `🎟️ Tienes *${row.total_cupones}* cupón(es) registrado(s):\n• ${codigos}\n\n` +
       `📅 Fecha del sorteo: ${formatDate(row.fecha_sorteo)}\n\n¡Mucha suerte! 🍀`;
+  },
+
+  /** Exporta el detalle a Excel, incluyendo acompañante y conteo de asistentes. */
+  exportarExcel() {
+    if (typeof XLSX === 'undefined') {
+      showToast('No se pudo cargar el generador de Excel. Verifique su conexión.', 'danger');
+      return;
+    }
+    const data = PageReportes.data || [];
+    if (data.length === 0) {
+      showToast('No hay datos para exportar', 'warning');
+      return;
+    }
+
+    const filas = data.map(row => ({
+      'Nombre': row.nombre_persona || '',
+      'Cédula': row.cedula,
+      'Teléfono': row.celular,
+      'Acompañante': row.acompanante ? 'Sí' : 'No',
+      'Personas a asistir': row.acompanante ? 2 : 1,
+      'Inscrito en línea': row.inscrito ? 'Sí' : 'No',
+      'Cupones': parseInt(row.total_cupones),
+      'Cupones pendientes de pago': parseInt(row.cupones_pendientes || 0),
+      'Códigos': (row.codigos || []).join(', '),
+      'Sorteo': row.sorteo_nombre,
+      'Fecha del sorteo': formatDate(row.fecha_sorteo),
+    }));
+
+    const t = PageReportes.calcTotales(data);
+    const resumen = [
+      { Indicador: 'Participantes únicos', Valor: t.personas },
+      { Indicador: 'Con acompañante', Valor: t.acompanantes },
+      { Indicador: 'Total de personas a asistir', Valor: t.asistentes },
+      { Indicador: 'Total de cupones', Valor: t.totalCupones },
+      { Indicador: 'Cupones pendientes de pago', Valor: t.pendientes },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Participantes');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), 'Resumen');
+
+    const sel = document.getElementById('rptSorteo');
+    const nombre = (sel.value ? sel.options[sel.selectedIndex].text : 'todos-los-sorteos')
+      .replace(/[^a-z0-9]/gi, '_').substring(0, 40);
+    XLSX.writeFile(wb, `reporte-cupones-${nombre}.xlsx`);
+    showToast('Archivo Excel generado', 'success');
   },
 
   async descargarPDF() {

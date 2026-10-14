@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^New-Item -ItemType Directory -Path \"c:\\\\Proyectos\\\\Github\\\\Cuponera\\\\cuponera\\\\src\\\\utils\" -Force \\| Out-Null; Test-Path \"c:\\\\Proyectos\\\\Github\\\\Cuponera\\\\cuponera\\\\src\\\\utils\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

@@ -18,9 +18,13 @@ router.get('/estadisticas', async (req, res) => {
       s.nombre AS sorteo_nombre,
       s.fecha_sorteo,
       COUNT(c.id) AS total_cupones,
+      COUNT(c.id) FILTER (WHERE c.estado_pago = 'pendiente') AS cupones_pendientes,
+      BOOL_OR(i.id IS NOT NULL) AS inscrito,
+      BOOL_OR(COALESCE(i.acompanante, FALSE)) AS acompanante,
       ARRAY_AGG(c.codigo ORDER BY c.created_at) AS codigos
     FROM cupones c
     JOIN sorteos s ON c.sorteo_id = s.id
+    LEFT JOIN inscripciones i ON i.sorteo_id = c.sorteo_id AND i.cedula = c.cedula
     WHERE 1=1
   `;
   const params = [];

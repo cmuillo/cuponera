@@ -1,39 +1,20 @@
 const express = require('express');
 const { pool } = require('../db');
 const authMiddleware = require('../middleware/auth');
+const { generateUniqueCouponCode } = require('../utils/cupones');
 
 const router = express.Router();
 router.use(authMiddleware);
 
-/** Genera código único con formato: [SORTEO_ID_3]-[6_ALFANUM] */
-async function generateUniqueCouponCode(sorteoId) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code;
-  let exists = true;
-  let attempts = 0;
-  const prefix = String(sorteoId).padStart(3, '0');
-
-  while (exists && attempts < 20) {
-    let random = '';
-    for (let i = 0; i < 6; i++) {
-      random += chars[Math.floor(Math.random() * chars.length)];
-    }
-    code = `${prefix}-${random}`;
-    const result = await pool.query('SELECT id FROM cupones WHERE codigo = $1', [code]);
-    exists = result.rows.length > 0;
-    attempts++;
-  }
-  if (exists) throw new Error('No se pudo generar código único.');
-  return code;
-}
-
 // GET /api/cupones
 router.get('/', async (req, res) => {
-  const { sorteoId, celular, cedula } = req.query;
+  const { sorteoId, celular, cedula, estadoPago } = req.query;
   let query = `
-    SELECT c.*, s.nombre AS sorteo_nombre, s.fecha_sorteo, s.descripcion AS sorteo_descripcion
+    SELECT c.*, s.nombre AS sorteo_nombre, s.fecha_sorteo, s.descripcion AS sorteo_descripcion,
+           i.acompanante
     FROM cupones c
     JOIN sorteos s ON c.sorteo_id = s.id
+    LEFT JOIN inscripciones i ON i.sorteo_id = c.sorteo_id AND i.cedula = c.cedula
     WHERE 1=1
   `;
   const params = [];
@@ -41,6 +22,7 @@ router.get('/', async (req, res) => {
   if (sorteoId) { query += ` AND c.sorteo_id = $${idx++}`; params.push(sorteoId); }
   if (celular)  { query += ` AND c.celular ILIKE $${idx++}`; params.push(`%${celular}%`); }
   if (cedula)   { query += ` AND c.cedula ILIKE $${idx++}`; params.push(`%${cedula}%`); }
+  if (estadoPago) { query += ` AND c.estado_pago = $${idx++}`; params.push(estadoPago); }
   query += ' ORDER BY c.created_at DESC';
 
   try {
@@ -139,6 +121,44 @@ router.post('/reset-ganadores', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al reiniciar ganadores.' });
+  }
+});
+
+// PATCH /api/cupones/:id/pago  — confirmar o revertir el pago de un cupón comprado
+router.patch('/:id/pago', async (req, res) => {
+  const { id } = req.params;
+  const estado = req.body.estado_pago === 'pendiente' ? 'pendiente' : 'confirmado';
+  try {
+    const result = await pool.query(
+      'UPDATE cupones SET estado_pago = $1 WHERE id = $2 RETURNING *',
+      [estado, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Cupón no encontrado.' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al actualizar el estado de pago.' });
+  }
+});
+
+// POST /api/cupones/confirmar-pago-lote — confirma todos los cupones pendientes de una cédula
+router.post('/confirmar-pago-lote', async (req, res) => {
+  const { sorteo_id, cedula } = req.body;
+  if (!sorteo_id || !cedula) {
+    return res.status(400).json({ error: 'sorteo_id y cédula son requeridos.' });
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE cupones SET estado_pago = 'confirmado'
+       WHERE sorteo_id = $1 AND cedula = $2 AND estado_pago = 'pendiente' RETURNING id`,
+      [sorteo_id, cedula]
+    );
+    res.json({ confirmados: result.rows.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al confirmar los pagos.' });
   }
 });
 

@@ -10,6 +10,8 @@ const authRoutes = require('./src/routes/auth');
 const sorteoRoutes = require('./src/routes/sorteos');
 const cuponRoutes = require('./src/routes/cupones');
 const reporteRoutes = require('./src/routes/reportes');
+const configRoutes = require('./src/routes/config');
+const inscripcionRoutes = require('./src/routes/inscripciones');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +43,13 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/sorteos', sorteoRoutes);
 app.use('/api/cupones', cuponRoutes);
 app.use('/api/reportes', reporteRoutes);
+app.use('/api/config', configRoutes);
+app.use('/api/inscripciones', inscripcionRoutes);
+
+// Ventana pública de inscripción (sin autenticación)
+app.get('/inscripcion', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'inscripcion.html'));
+});
 
 // SPA fallback
 app.get('*', (req, res) => {

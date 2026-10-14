@@ -15,17 +15,25 @@ const PageHistorial = {
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-2 align-items-end">
-            <div class="col-sm-4">
+            <div class="col-sm-3">
               <label class="form-label small fw-semibold">Sorteo</label>
               <select id="filtroSorteo" class="form-select form-select-sm">${sorteoOpts}</select>
             </div>
-            <div class="col-sm-3">
+            <div class="col-sm-2">
               <label class="form-label small fw-semibold">Cédula</label>
               <input type="text" id="filtroCedula" class="form-control form-control-sm" placeholder="Buscar..." />
             </div>
-            <div class="col-sm-3">
+            <div class="col-sm-2">
               <label class="form-label small fw-semibold">Celular</label>
               <input type="text" id="filtroCelular" class="form-control form-control-sm" placeholder="Buscar..." />
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small fw-semibold">Estado de pago</label>
+              <select id="filtroEstadoPago" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="pendiente">Pendientes de pago</option>
+                <option value="confirmado">Confirmados</option>
+              </select>
             </div>
             <div class="col-sm-2">
               <button class="btn btn-primary btn-sm w-100" onclick="PageHistorial.loadCupones()">
@@ -68,9 +76,11 @@ const PageHistorial = {
     const sorteoId = document.getElementById('filtroSorteo').value;
     const cedula = document.getElementById('filtroCedula').value.trim();
     const celular = document.getElementById('filtroCelular').value.trim();
+    const estadoPago = document.getElementById('filtroEstadoPago').value;
     if (sorteoId) params.set('sorteoId', sorteoId);
     if (cedula) params.set('cedula', cedula);
     if (celular) params.set('celular', celular);
+    if (estadoPago) params.set('estadoPago', estadoPago);
 
     try {
       const cupones = await API.get(`/api/cupones?${params.toString()}`);
@@ -91,6 +101,8 @@ const PageHistorial = {
                 <th>Titular</th>
                 <th>Cédula</th>
                 <th>Celular</th>
+                <th>Origen</th>
+                <th>Pago</th>
                 <th>Fecha reg.</th>
                 <th>Acciones</th>
               </tr>
@@ -102,11 +114,25 @@ const PageHistorial = {
                     ${c.ganador ? '<span class="badge bg-warning text-dark ms-1"><i class="bi bi-trophy-fill"></i> Ganador</span>' : ''}
                   </td>
                   <td><span class="d-inline-block text-truncate" style="max-width:130px" title="${escHtml(c.sorteo_nombre)}">${escHtml(c.sorteo_nombre)}</span></td>
-                  <td>${escHtml(c.nombre_persona || '—')}</td>
+                  <td>${escHtml(c.nombre_persona || '—')}
+                    ${c.acompanante ? '<span class="badge bg-light text-dark border ms-1" title="Asiste con acompañante"><i class="bi bi-people-fill"></i></span>' : ''}
+                  </td>
                   <td>${escHtml(c.cedula)}</td>
                   <td>${escHtml(c.celular)}</td>
-                  <td class="text-muted small">${new Date(c.created_at).toLocaleDateString('es-ES')}</td>
+                  <td>${PageHistorial.origenBadge(c.origen)}</td>
                   <td>
+                    ${c.estado_pago === 'pendiente'
+                      ? '<span class="badge bg-warning text-dark">Pendiente</span>'
+                      : '<span class="badge bg-success">Confirmado</span>'}
+                  </td>
+                  <td class="text-muted small">${new Date(c.created_at).toLocaleDateString('es-ES')}</td>
+                  <td class="text-nowrap">
+                    ${c.estado_pago === 'pendiente'
+                      ? `<button class="btn btn-success btn-sm me-1" title="Confirmar pago"
+                           onclick="PageHistorial.setPago(${c.id}, 'confirmado')">
+                           <i class="bi bi-cash-coin"></i>
+                         </button>`
+                      : ''}
                     <a href="${buildWaLink(c.celular, buildCuponWaText(c))}" target="_blank" rel="noopener noreferrer"
                        class="btn btn-whatsapp btn-sm me-1" title="Enviar por WhatsApp">
                       <i class="bi bi-whatsapp"></i>
@@ -122,6 +148,24 @@ const PageHistorial = {
         </div>`;
     } catch (err) {
       el.innerHTML = `<div class="alert alert-danger m-2">${err.message}</div>`;
+    }
+  },
+
+  origenBadge(origen) {
+    const mapa = {
+      inscripcion: '<span class="badge bg-info text-dark">Inscripción</span>',
+      compra: '<span class="badge bg-primary">Compra</span>',
+    };
+    return mapa[origen] || '<span class="badge bg-secondary">Manual</span>';
+  },
+
+  async setPago(id, estado) {
+    try {
+      await API.patch(`/api/cupones/${id}/pago`, { estado_pago: estado });
+      showToast('Estado de pago actualizado', 'success');
+      await PageHistorial.loadCupones();
+    } catch (err) {
+      showToast(err.message, 'danger');
     }
   },
 

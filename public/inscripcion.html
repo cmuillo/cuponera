@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inscripción</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎟️</text></svg>" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="bg-light">
+
+  <div class="container py-4" style="max-width: 720px;">
+
+    <!-- Encabezado de la actividad -->
+    <div id="inscHeader" class="text-center mb-4">
+      <div class="spinner-border text-primary"></div>
+    </div>
+
+    <!-- Error de carga -->
+    <div id="inscFatal" class="alert alert-danger d-none"></div>
+
+    <!-- Contenido -->
+    <div id="inscBody" class="d-none">
+      <ul class="nav nav-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabInscripcion" type="button" role="tab">
+            <i class="bi bi-person-plus-fill me-1"></i>Inscripción
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCompra" type="button" role="tab">
+            <i class="bi bi-cart-plus-fill me-1"></i>Comprar cupones
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content bg-white border border-top-0 rounded-bottom p-4">
+
+        <!-- TAB 1: INSCRIPCIÓN -->
+        <div class="tab-pane fade show active" id="tabInscripcion" role="tabpanel">
+          <div id="inscAlert" class="d-none"></div>
+
+          <form id="inscForm" autocomplete="off">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Nombre completo *</label>
+              <input type="text" id="inscNombre" class="form-control" maxlength="255" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Cédula *</label>
+              <input type="text" id="inscCedula" class="form-control" maxlength="25" placeholder="Ej: 112340567" required />
+              <div class="form-text" id="inscPadronHint"></div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Teléfono *</label>
+              <div class="input-group">
+                <span class="input-group-text">📱</span>
+                <input type="tel" id="inscCelular" class="form-control" maxlength="20" placeholder="Ej: 88001234" required />
+              </div>
+              <div class="form-text">Para Costa Rica: 8 dígitos.</div>
+            </div>
+            <div class="mb-4 form-check">
+              <input class="form-check-input" type="checkbox" id="inscAcompanante" />
+              <label class="form-check-label fw-semibold" for="inscAcompanante">
+                Asistiré con un acompañante
+              </label>
+              <div class="form-text">Marque esta casilla para que podamos contar su acompañante en la asistencia.</div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2" id="inscBtn">
+              <i class="bi bi-ticket-perforated me-1"></i>Inscribirme y generar mi cupón
+            </button>
+          </form>
+
+          <!-- Resultado inscripción -->
+          <div id="inscResult" class="d-none"></div>
+        </div>
+
+        <!-- TAB 2: COMPRAR CUPONES -->
+        <div class="tab-pane fade" id="tabCompra" role="tabpanel">
+          <p class="text-muted small">
+            <i class="bi bi-info-circle me-1"></i>
+            Para comprar cupones adicionales debe estar inscrito previamente. Ingrese su cédula para continuar.
+          </p>
+
+          <div id="compraAlert" class="d-none"></div>
+
+          <form id="compraVerifyForm" class="mb-3" autocomplete="off">
+            <label class="form-label fw-semibold">Cédula *</label>
+            <div class="input-group">
+              <input type="text" id="compraCedula" class="form-control" maxlength="25" placeholder="Ej: 112340567" required />
+              <button class="btn btn-outline-primary" type="submit" id="compraVerifyBtn">
+                <i class="bi bi-search me-1"></i>Verificar
+              </button>
+            </div>
+          </form>
+
+          <div id="compraPaquetes" class="d-none"></div>
+          <div id="compraResult" class="d-none"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="text-center text-muted small mt-4 mb-0">🎟️ Cuponera</p>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+    <div id="appToast" class="toast align-items-center border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="toastMsg"></div>
+        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/inscripcion.js"></script>
+</body>
+</html>

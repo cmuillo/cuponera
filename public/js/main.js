@@ -73,7 +73,8 @@ const PAGES = {
   historial:{ title: 'Historial de Cupones',     render: (c) => PageHistorial.render(c) },
   reportes: { title: 'Reportes',                 render: (c) => PageReportes.render(c) },
   tombola:  { title: 'Tómbola',                  render: (c) => PageTombola.render(c) },
-  sorteos:  { title: 'Configuración de Sorteos', render: (c) => PageSorteos.render(c) },
+  sorteos:  { title: 'Sorteos y Actividades',    render: (c) => PageSorteos.render(c) },
+  config:   { title: 'Configuración del Sistema', render: (c) => PageConfig.render(c) },
   cuenta:   { title: 'Mi Cuenta',                render: (c) => PageCuenta.render(c) },
 };
 

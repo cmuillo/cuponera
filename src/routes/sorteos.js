@@ -10,13 +10,18 @@ router.use(authMiddleware);
 // GET /api/sorteos
 router.get('/', async (req, res) => {
   const { activo } = req.query;
-  let query = 'SELECT * FROM sorteos';
+  let query = `
+    SELECT s.*,
+      (SELECT COUNT(*)::int FROM sorteo_padron p WHERE p.sorteo_id = s.id) AS padron_total,
+      (SELECT COUNT(*)::int FROM inscripciones i WHERE i.sorteo_id = s.id) AS inscritos_total
+    FROM sorteos s
+  `;
   const params = [];
   if (activo !== undefined) {
-    query += ' WHERE activo = $1';
+    query += ' WHERE s.activo = $1';
     params.push(activo === 'true');
   }
-  query += ' ORDER BY created_at DESC';
+  query += ' ORDER BY s.created_at DESC';
   try {
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -28,7 +33,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/sorteos
 router.post('/', async (req, res) => {
-  const { nombre, descripcion, fecha_sorteo, activo, monto_minimo } = req.body;
+  const { nombre, descripcion, fecha_sorteo, activo, monto_minimo, modo_inscripcion, restringir_padron } = req.body;
   if (!nombre || !fecha_sorteo) {
     return res.status(400).json({ error: 'Nombre y fecha del sorteo son requeridos.' });
   }
@@ -37,11 +42,13 @@ router.post('/', async (req, res) => {
   }
   const montoMin = parseInt(monto_minimo) || 0;
   if (montoMin < 0) return res.status(400).json({ error: 'El monto mínimo no puede ser negativo.' });
+  const modoInscripcion = modo_inscripcion === true;
+  const restringirPadron = modoInscripcion && restringir_padron === true;
   try {
     const result = await pool.query(
-      `INSERT INTO sorteos (nombre, descripcion, fecha_sorteo, activo, monto_minimo)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin]
+      `INSERT INTO sorteos (nombre, descripcion, fecha_sorteo, activo, monto_minimo, modo_inscripcion, restringir_padron)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion, restringirPadron]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -53,17 +60,20 @@ router.post('/', async (req, res) => {
 // PUT /api/sorteos/:id
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { nombre, descripcion, fecha_sorteo, activo, monto_minimo } = req.body;
+  const { nombre, descripcion, fecha_sorteo, activo, monto_minimo, modo_inscripcion, restringir_padron } = req.body;
   if (!nombre || !fecha_sorteo) {
     return res.status(400).json({ error: 'Nombre y fecha del sorteo son requeridos.' });
   }
   const montoMin = parseInt(monto_minimo) || 0;
   if (montoMin < 0) return res.status(400).json({ error: 'El monto mínimo no puede ser negativo.' });
+  const modoInscripcion = modo_inscripcion === true;
+  const restringirPadron = modoInscripcion && restringir_padron === true;
   try {
     const result = await pool.query(
-      `UPDATE sorteos SET nombre=$1, descripcion=$2, fecha_sorteo=$3, activo=$4, monto_minimo=$5, updated_at=NOW()
-       WHERE id=$6 RETURNING *`,
-      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, id]
+      `UPDATE sorteos SET nombre=$1, descripcion=$2, fecha_sorteo=$3, activo=$4, monto_minimo=$5,
+         modo_inscripcion=$6, restringir_padron=$7, updated_at=NOW()
+       WHERE id=$8 RETURNING *`,
+      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion, restringirPadron, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Sorteo no encontrado.' });
@@ -111,6 +121,94 @@ router.delete('/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al eliminar el sorteo.' });
+  }
+});
+
+// GET /api/sorteos/:id/padron
+router.get('/:id/padron', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, cedula, nombre FROM sorteo_padron WHERE sorteo_id = $1 ORDER BY nombre NULLS LAST, cedula',
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener el listado autorizado.' });
+  }
+});
+
+// POST /api/sorteos/:id/padron — carga masiva desde Excel (ya convertido a JSON en el cliente)
+router.post('/:id/padron', async (req, res) => {
+  const { id } = req.params;
+  const { registros, reemplazar } = req.body;
+
+  if (!Array.isArray(registros) || registros.length === 0) {
+    return res.status(400).json({ error: 'No se recibió ningún registro válido.' });
+  }
+  if (registros.length > 20000) {
+    return res.status(400).json({ error: 'El listado no puede superar 20.000 registros.' });
+  }
+
+  // Normalizar y descartar duplicados dentro del propio archivo
+  const vistos = new Set();
+  const limpios = [];
+  let descartados = 0;
+  for (const r of registros) {
+    const cedula = String(r?.cedula || '').replace(/[\s-]/g, '').trim();
+    if (!cedula || cedula.length > 25 || vistos.has(cedula)) {
+      descartados++;
+      continue;
+    }
+    vistos.add(cedula);
+    limpios.push({ cedula, nombre: String(r?.nombre || '').trim().substring(0, 255) || null });
+  }
+  if (limpios.length === 0) {
+    return res.status(400).json({ error: 'Ninguna fila del archivo contiene una cédula válida.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    const sorteo = await client.query('SELECT id FROM sorteos WHERE id = $1', [id]);
+    if (sorteo.rows.length === 0) {
+      return res.status(404).json({ error: 'Sorteo no encontrado.' });
+    }
+
+    await client.query('BEGIN');
+    if (reemplazar === true) {
+      await client.query('DELETE FROM sorteo_padron WHERE sorteo_id = $1', [id]);
+    }
+    for (const r of limpios) {
+      await client.query(
+        `INSERT INTO sorteo_padron (sorteo_id, cedula, nombre) VALUES ($1, $2, $3)
+         ON CONFLICT (sorteo_id, cedula) DO UPDATE SET nombre = COALESCE(EXCLUDED.nombre, sorteo_padron.nombre)`,
+        [id, r.cedula, r.nombre]
+      );
+    }
+    await client.query('COMMIT');
+
+    const total = await pool.query(
+      'SELECT COUNT(*)::int AS total FROM sorteo_padron WHERE sorteo_id = $1',
+      [id]
+    );
+    res.json({ procesados: limpios.length, descartados, total: total.rows[0].total });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: 'Error al cargar el listado autorizado.' });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/sorteos/:id/padron — vacía el listado autorizado
+router.delete('/:id/padron', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM sorteo_padron WHERE sorteo_id = $1', [req.params.id]);
+    res.json({ message: 'Listado autorizado eliminado.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al eliminar el listado autorizado.' });
   }
 });
 

@@ -4,12 +4,53 @@ Sistema web móvil y responsivo para gestión de sorteos, generación de cupones
 
 ## ✨ Funcionalidades
 
-- **Configuración de Sorteos** — Crear, editar, activar/desactivar sorteos con fecha y descripción
+- **Sorteos y Actividades** — Crear, editar, activar/desactivar sorteos con fecha y descripción
+- **Inscripción pública (invitados)** — Ventana sin login donde la persona se inscribe sola y obtiene su cupón, con casilla de acompañante y compra de cupones adicionales
+- **Padrón por Excel** — Restringir una actividad a un listado previo de cédulas cargado desde `.xlsx`/`.csv`
 - **Generación de Cupones** — Código único por participante (cédula + celular), con botón de WhatsApp
-- **Historial de Cupones** — Búsqueda y reenvío por WhatsApp
-- **Reportes** — Estadísticas por cédula/celular + PDF cuadrícula para imprimir/tómbola física
+- **Historial de Cupones** — Búsqueda, reenvío por WhatsApp y confirmación de pagos pendientes
+- **Reportes** — Estadísticas por cédula/celular, exportación a Excel con acompañantes + PDF cuadrícula para imprimir/tómbola física
 - **Tómbola Digital** — Ruleta animada HTML5 Canvas, modo único y extracción múltiple
+- **Configuración del Sistema** — Número de WhatsApp para comprobantes y paquetes de cupones
 - **Mi Cuenta** — Cambio de contraseña del administrador
+
+## 🎫 Inscripción pública de invitados
+
+Cada sorteo puede habilitarse en modo **inscripción pública**. Al activarlo se obtiene un enlace
+copiable desde *Sorteos y Actividades*:
+
+```
+https://tu-dominio/inscripcion?sorteo=<id>
+```
+
+Esa ventana no requiere login y tiene dos pestañas:
+
+1. **Inscripción** — Nombre, cédula, teléfono y casilla *"Asistiré con un acompañante"*.
+   Al enviar se genera automáticamente **1 cupón** (estado de pago *confirmado*).
+2. **Comprar cupones** — Requiere estar inscrito previamente: la persona digita su cédula, el
+   sistema la valida y muestra los paquetes configurados (por defecto ₡5.000 = 1 cupón,
+   ₡8.000 = 2 cupones, ₡10.000 = 3 cupones). Tras *Generar cupones* aparece el botón
+   **Enviar comprobante**, un link `wa.me` al número definido en *Configuración*.
+   Estos cupones quedan en estado **pendiente de pago** hasta que un administrador los
+   confirme desde el *Historial*.
+
+### Tipo de acceso
+
+Al crear o editar un sorteo con inscripción pública se elige entre:
+
+- **Libre** — cualquier persona puede inscribirse.
+- **Listado previo (padrón)** — solo cédulas presentes en el padrón. El listado se carga desde
+  un archivo Excel/CSV: se detecta automáticamente la columna de cédula y la de nombre (o se
+  asume columna A = cédula, columna B = nombre). Las cédulas se normalizan quitando espacios y
+  guiones, de modo que `1-1111-1111` y `111111111` se consideran la misma.
+
+## 📊 Exportación de reportes
+
+En *Reportes* el botón **Exportar Excel** genera un `.xlsx` con dos hojas:
+
+- **Participantes** — Nombre, cédula, teléfono, **acompañante**, cantidad de cupones, códigos y sorteo.
+- **Resumen** — Totales de cupones, participantes, acompañantes y **personas a asistir**
+  (participantes + acompañantes).
 
 ## 🚀 Despliegue en Railway
 
@@ -39,9 +80,13 @@ npm run dev            # http://localhost:3000
 
 ## 🔐 Seguridad
 - bcrypt (salt 12) · JWT (8h) · Rate limiting login · Helmet · SQL paramétrico
+- Las rutas públicas de inscripción (`/api/inscripciones`) no requieren token pero tienen
+  rate limiting propio (60 solicitudes por IP cada 15 minutos).
 
 ## 📱 WhatsApp
-Links `wa.me/` con mensaje prellenado. Números colombianos de 10 dígitos: se agrega +57 automáticamente.
+Links `wa.me/` con mensaje prellenado. Números costarricenses de 8 dígitos: se agrega +506 automáticamente.
+El número que recibe los comprobantes de compra se define en **Configuración del Sistema**
+(se guarda en la base de datos, no requiere variables de entorno).
 
 ## 📄 PDF
 A4, 3×5 = 15 cupones/página con bordes punteados para recorte.

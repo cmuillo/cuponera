@@ -6,6 +6,12 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
+const DEFAULT_PAQUETES = [
+  { monto: 5000, cupones: 1 },
+  { monto: 8000, cupones: 2 },
+  { monto: 10000, cupones: 3 },
+];
+
 async function initDB() {
   const client = await pool.connect();
   try {
@@ -48,6 +54,41 @@ async function initDB() {
       )
     `);
 
+    // Tabla de configuración del sistema (clave/valor)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS configuracion (
+        clave VARCHAR(60) PRIMARY KEY,
+        valor TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Padrón autorizado por sorteo (listado previo de cédulas)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sorteo_padron (
+        id SERIAL PRIMARY KEY,
+        sorteo_id INTEGER NOT NULL REFERENCES sorteos(id) ON DELETE CASCADE,
+        cedula VARCHAR(25) NOT NULL,
+        nombre VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (sorteo_id, cedula)
+      )
+    `);
+
+    // Inscripciones realizadas desde la ventana pública de invitado
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inscripciones (
+        id SERIAL PRIMARY KEY,
+        sorteo_id INTEGER NOT NULL REFERENCES sorteos(id) ON DELETE CASCADE,
+        cedula VARCHAR(25) NOT NULL,
+        nombre VARCHAR(255),
+        celular VARCHAR(25) NOT NULL,
+        acompanante BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (sorteo_id, cedula)
+      )
+    `);
+
     await client.query('COMMIT');
 
     // Migraciones no destructivas (columnas nuevas)
@@ -57,6 +98,30 @@ async function initDB() {
     await pool.query(`
       ALTER TABLE cupones ADD COLUMN IF NOT EXISTS monto_venta INTEGER DEFAULT 0
     `);
+    await pool.query(`
+      ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS modo_inscripcion BOOLEAN DEFAULT FALSE
+    `);
+    await pool.query(`
+      ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS restringir_padron BOOLEAN DEFAULT FALSE
+    `);
+    await pool.query(`
+      ALTER TABLE cupones ADD COLUMN IF NOT EXISTS origen VARCHAR(20) DEFAULT 'admin'
+    `);
+    await pool.query(`
+      ALTER TABLE cupones ADD COLUMN IF NOT EXISTS estado_pago VARCHAR(20) DEFAULT 'confirmado'
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_cupones_sorteo_cedula ON cupones (sorteo_id, cedula)
+    `);
+
+    // Configuración por defecto
+    await pool.query(
+      `INSERT INTO configuracion (clave, valor) VALUES
+         ('whatsapp_comprobantes', ''),
+         ('paquetes_cupones', $1)
+       ON CONFLICT (clave) DO NOTHING`,
+      [JSON.stringify(DEFAULT_PAQUETES)]
+    );
 
     // Crear usuario admin si no existe
     const adminUser = process.env.ADMIN_USER || 'admin';
@@ -78,4 +143,4 @@ async function initDB() {
   }
 }
 
-module.exports = { pool, initDB };
+module.exports = { pool, initDB, DEFAULT_PAQUETES };
