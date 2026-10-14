@@ -12,6 +12,7 @@ router.get('/publica', async (req, res) => {
     res.json({
       whatsapp_comprobantes: config.whatsapp_comprobantes,
       paquetes_cupones: config.paquetes_cupones,
+      compras_adicionales_habilitadas: config.compras_adicionales_habilitadas,
     });
   } catch (err) {
     console.error(err);
@@ -31,7 +32,10 @@ router.get('/', authMiddleware, async (req, res) => {
 
 // PUT /api/config
 router.put('/', authMiddleware, async (req, res) => {
-  const { whatsapp_comprobantes, paquetes_cupones } = req.body;
+  const { whatsapp_comprobantes, paquetes_cupones, compras_adicionales_habilitadas } = req.body;
+  if (typeof compras_adicionales_habilitadas !== 'boolean') {
+    return res.status(400).json({ error: 'Debe indicar si las compras adicionales están habilitadas.' });
+  }
 
   let whatsapp = '';
   if (whatsapp_comprobantes) {
@@ -50,6 +54,7 @@ router.put('/', authMiddleware, async (req, res) => {
 
   try {
     await setConfig('whatsapp_comprobantes', whatsapp);
+    await setConfig('compras_adicionales_habilitadas', String(compras_adicionales_habilitadas));
     await setConfig('paquetes_cupones', JSON.stringify(paquetes));
     res.json(await getConfig());
   } catch (err) {

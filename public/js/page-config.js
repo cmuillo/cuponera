@@ -2,18 +2,36 @@
  * page-config.js — Configuración general del sistema
  */
 const PageConfig = {
-  config: { whatsapp_comprobantes: '', paquetes_cupones: [] },
+  config: { whatsapp_comprobantes: '', paquetes_cupones: [], compras_adicionales_habilitadas: true },
 
   async render(container) {
     try {
       PageConfig.config = await API.get('/api/config');
     } catch (e) {
-      PageConfig.config = { whatsapp_comprobantes: '', paquetes_cupones: [] };
+      PageConfig.config = { whatsapp_comprobantes: '', paquetes_cupones: [], compras_adicionales_habilitadas: true };
     }
 
     container.innerHTML = `
       <h1 class="page-title"><i class="bi bi-sliders"></i>Configuración del Sistema</h1>
       <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header">Compras adicionales</div>
+            <div class="card-body p-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="cfgComprasAdicionales"
+                       ${PageConfig.config.compras_adicionales_habilitadas !== false ? 'checked' : ''} />
+                <label class="form-check-label fw-semibold" for="cfgComprasAdicionales">
+                  Permitir compra de cupones adicionales
+                </label>
+              </div>
+              <div class="form-text">
+                Si se desactiva, la pestaña de compra no aparecerá en la ventana pública.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="col-lg-6">
           <div class="card">
             <div class="card-header">WhatsApp para comprobantes</div>
@@ -114,6 +132,7 @@ const PageConfig = {
       PageConfig.config = await API.put('/api/config', {
         whatsapp_comprobantes: document.getElementById('cfgWhatsapp').value.trim(),
         paquetes_cupones: PageConfig.config.paquetes_cupones,
+        compras_adicionales_habilitadas: document.getElementById('cfgComprasAdicionales').checked,
       });
       PageConfig.renderPaquetes();
       showToast('Configuración guardada correctamente', 'success');

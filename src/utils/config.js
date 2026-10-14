@@ -1,5 +1,10 @@
 const { pool, DEFAULT_PAQUETES } = require('../db');
 
+function parseCompraAdicionales(valor) {
+  if (valor === undefined || valor === null || valor === '') return true;
+  return valor !== false && String(valor).toLowerCase() !== 'false';
+}
+
 /** Valida y ordena la lista de paquetes. Lanza Error si es inválida. */
 function sanitizePaquetes(paquetes) {
   if (!Array.isArray(paquetes) || paquetes.length === 0) {
@@ -41,6 +46,7 @@ async function getConfig() {
   return {
     whatsapp_comprobantes: map.whatsapp_comprobantes || '',
     paquetes_cupones: paquetes,
+    compras_adicionales_habilitadas: parseCompraAdicionales(map.compras_adicionales_habilitadas),
   };
 }
 
@@ -52,4 +58,4 @@ async function setConfig(clave, valor) {
   );
 }
 
-module.exports = { getConfig, setConfig, sanitizePaquetes };
+module.exports = { getConfig, setConfig, sanitizePaquetes, parseCompraAdicionales };

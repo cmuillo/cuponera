@@ -203,7 +203,11 @@ router.post('/compra', async (req, res) => {
     }
     const inscripcion = insc.rows[0];
 
-    const { paquetes_cupones: paquetes, whatsapp_comprobantes } = await getConfig();
+    const config = await getConfig();
+    if (!config.compras_adicionales_habilitadas) {
+      return res.status(403).json({ error: 'Las compras adicionales están deshabilitadas.' });
+    }
+    const { paquetes_cupones: paquetes, whatsapp_comprobantes } = config;
     const paquete = paquetes.find((p) => p.monto === monto);
     if (!paquete) {
       return res.status(400).json({ error: 'El paquete seleccionado no está disponible.' });

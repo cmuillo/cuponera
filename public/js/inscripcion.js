@@ -4,7 +4,7 @@
 const Inscripcion = {
   sorteoId: null,
   sorteo: null,
-  config: { whatsapp_comprobantes: '', paquetes_cupones: [] },
+  config: { whatsapp_comprobantes: '', paquetes_cupones: [], compras_adicionales_habilitadas: true },
   cedulaVerificada: null,
   cedulaInscrita: null,
 
@@ -19,7 +19,9 @@ const Inscripcion = {
     try {
       const [sorteo, config] = await Promise.all([
         this.get(`/api/inscripciones/sorteo/${this.sorteoId}`),
-        this.get('/api/config/publica').catch(() => ({ whatsapp_comprobantes: '', paquetes_cupones: [] })),
+        this.get('/api/config/publica').catch(() => ({
+          whatsapp_comprobantes: '', paquetes_cupones: [], compras_adicionales_habilitadas: true,
+        })),
       ]);
       this.sorteo = sorteo;
       this.config = config;
@@ -29,6 +31,11 @@ const Inscripcion = {
 
     this.renderHeader();
     document.getElementById('inscBody').classList.remove('d-none');
+    if (this.config.compras_adicionales_habilitadas !== false) {
+      document.getElementById('compraTabItem').classList.remove('d-none');
+    } else {
+      document.getElementById('tabCompra').remove();
+    }
 
     if (this.sorteo.restringir_padron) {
       document.getElementById('inscPadronHint').innerHTML =
@@ -39,10 +46,13 @@ const Inscripcion = {
       e.preventDefault();
       this.inscribir();
     });
-    document.getElementById('compraVerifyForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.verificarCedula();
-    });
+    const compraForm = document.getElementById('compraVerifyForm');
+    if (compraForm) {
+      compraForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.verificarCedula();
+      });
+    }
   },
 
   // ---- RENDER ----

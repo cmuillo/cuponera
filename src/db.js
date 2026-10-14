@@ -118,6 +118,7 @@ async function initDB() {
     await pool.query(
       `INSERT INTO configuracion (clave, valor) VALUES
          ('whatsapp_comprobantes', ''),
+         ('compras_adicionales_habilitadas', 'true'),
          ('paquetes_cupones', $1)
        ON CONFLICT (clave) DO NOTHING`,
       [JSON.stringify(DEFAULT_PAQUETES)]

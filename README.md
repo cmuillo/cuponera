@@ -34,6 +34,11 @@ Esa ventana no requiere login y tiene dos pestañas:
    Estos cupones quedan en estado **pendiente de pago** hasta que un administrador los
    confirme desde el *Historial*.
 
+La opción **Permitir compra de cupones adicionales** de *Configuración del Sistema* permite
+desactivar completamente este flujo cuando la actividad solo requiere confirmar asistencia.
+Al desactivarla, la pestaña no se muestra en la ventana pública y la API también rechaza
+intentos de compra.
+
 ### Tipo de acceso
 
 Al crear o editar un sorteo con inscripción pública se elige entre:
