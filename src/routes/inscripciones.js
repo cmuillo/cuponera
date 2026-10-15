@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const { pool } = require('../db');
 const { getConfig } = require('../utils/config');
 const { generateUniqueCouponCode, normalizeCelular } = require('../utils/cupones');
+const { parseAcompanante } = require('../utils/inscripciones');
 
 const router = express.Router();
 
@@ -88,6 +89,7 @@ router.get('/estado', async (req, res) => {
       nombre: inscripcion.nombre,
       celular: inscripcion.celular,
       acompanante: inscripcion.acompanante,
+      acompanante_nombre: inscripcion.acompanante_nombre,
       cupones: cupones.rows,
     });
   } catch (err) {
@@ -102,7 +104,7 @@ router.post('/', async (req, res) => {
   const cedula = cleanCedula(req.body.cedula);
   const nombre = String(req.body.nombre || '').trim();
   const celular = normalizeCelular(req.body.celular);
-  const acompanante = req.body.acompanante === true;
+  const acomp = parseAcompanante(req.body);
 
   if (!Number.isInteger(sorteoId) || !cedula || !nombre || !req.body.celular) {
     return res.status(400).json({ error: 'Nombre, cédula y teléfono son requeridos.' });
@@ -112,6 +114,9 @@ router.post('/', async (req, res) => {
   }
   if (!celular) {
     return res.status(400).json({ error: 'Formato de teléfono inválido.' });
+  }
+  if (acomp.error) {
+    return res.status(400).json({ error: acomp.error });
   }
 
   const client = await pool.connect();
@@ -145,9 +150,9 @@ router.post('/', async (req, res) => {
 
     await client.query('BEGIN');
     await client.query(
-      `INSERT INTO inscripciones (sorteo_id, cedula, nombre, celular, acompanante)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [sorteo.id, cedula, nombre, celular, acompanante]
+      `INSERT INTO inscripciones (sorteo_id, cedula, nombre, celular, acompanante, acompanante_nombre)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [sorteo.id, cedula, nombre, celular, acomp.acompanante, acomp.acompanante_nombre]
     );
     const cupon = await client.query(
       `INSERT INTO cupones (codigo, sorteo_id, celular, cedula, nombre_persona, monto_venta, origen, estado_pago)
@@ -157,7 +162,13 @@ router.post('/', async (req, res) => {
     await client.query('COMMIT');
 
     res.status(201).json({
-      inscripcion: { nombre, cedula, celular, acompanante },
+      inscripcion: {
+        nombre,
+        cedula,
+        celular,
+        acompanante: acomp.acompanante,
+        acompanante_nombre: acomp.acompanante_nombre,
+      },
       sorteo: {
         id: sorteo.id,
         nombre: sorteo.nombre,

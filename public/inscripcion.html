@@ -60,12 +60,19 @@
               </div>
               <div class="form-text">Para Costa Rica: 8 dígitos.</div>
             </div>
-            <div class="mb-4 form-check">
-              <input class="form-check-input" type="checkbox" id="inscAcompanante" />
-              <label class="form-check-label fw-semibold" for="inscAcompanante">
-                Asistiré con un acompañante
-              </label>
-              <div class="form-text">Marque esta casilla para que podamos contar su acompañante en la asistencia.</div>
+            <div class="mb-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="inscAcompanante" />
+                <label class="form-check-label fw-semibold" for="inscAcompanante">
+                  Asistiré con un acompañante
+                </label>
+                <div class="form-text">Marque esta casilla para que podamos contar su acompañante en la asistencia.</div>
+              </div>
+              <div id="inscAcompananteBox" class="mt-3 d-none">
+                <label class="form-label fw-semibold" for="inscAcompananteNombre">Nombre del acompañante *</label>
+                <input type="text" id="inscAcompananteNombre" class="form-control" maxlength="255"
+                       placeholder="Nombre completo de su acompañante" />
+              </div>
             </div>
             <button type="submit" class="btn btn-primary w-100 py-2" id="inscBtn">
               <i class="bi bi-ticket-perforated me-1"></i>Inscribirme y generar mi cupón

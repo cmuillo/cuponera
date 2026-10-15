@@ -21,6 +21,7 @@ router.get('/estadisticas', async (req, res) => {
       COUNT(c.id) FILTER (WHERE c.estado_pago = 'pendiente') AS cupones_pendientes,
       BOOL_OR(i.id IS NOT NULL) AS inscrito,
       BOOL_OR(COALESCE(i.acompanante, FALSE)) AS acompanante,
+      MAX(i.acompanante_nombre) AS acompanante_nombre,
       ARRAY_AGG(c.codigo ORDER BY c.created_at) AS codigos
     FROM cupones c
     JOIN sorteos s ON c.sorteo_id = s.id

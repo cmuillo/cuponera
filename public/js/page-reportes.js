@@ -153,7 +153,9 @@ const PageReportes = {
                   </td>
                   <td class="text-center">
                     ${row.acompanante
-                      ? '<span class="badge bg-success"><i class="bi bi-people-fill me-1"></i>Sí</span>'
+                      ? `<span class="badge bg-success"><i class="bi bi-people-fill me-1"></i>Sí</span>
+                         ${row.acompanante_nombre
+                           ? `<br><small class="text-muted">${escHtml(row.acompanante_nombre)}</small>` : ''}`
                       : '<span class="text-muted">No</span>'}
                   </td>
                   <td class="text-center">
@@ -226,6 +228,7 @@ const PageReportes = {
       'Cédula': row.cedula,
       'Teléfono': row.celular,
       'Acompañante': row.acompanante ? 'Sí' : 'No',
+      'Nombre del acompañante': row.acompanante ? (row.acompanante_nombre || '') : '',
       'Personas a asistir': row.acompanante ? 2 : 1,
       'Inscrito en línea': row.inscrito ? 'Sí' : 'No',
       'Cupones': parseInt(row.total_cupones),

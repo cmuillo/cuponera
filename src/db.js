@@ -84,6 +84,7 @@ async function initDB() {
         nombre VARCHAR(255),
         celular VARCHAR(25) NOT NULL,
         acompanante BOOLEAN DEFAULT FALSE,
+        acompanante_nombre VARCHAR(255),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE (sorteo_id, cedula)
       )
@@ -109,6 +110,9 @@ async function initDB() {
     `);
     await pool.query(`
       ALTER TABLE cupones ADD COLUMN IF NOT EXISTS estado_pago VARCHAR(20) DEFAULT 'confirmado'
+    `);
+    await pool.query(`
+      ALTER TABLE inscripciones ADD COLUMN IF NOT EXISTS acompanante_nombre VARCHAR(255)
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_cupones_sorteo_cedula ON cupones (sorteo_id, cedula)

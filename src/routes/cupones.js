@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
   const { sorteoId, celular, cedula, estadoPago } = req.query;
   let query = `
     SELECT c.*, s.nombre AS sorteo_nombre, s.fecha_sorteo, s.descripcion AS sorteo_descripcion,
-           i.acompanante
+           i.acompanante, i.acompanante_nombre
     FROM cupones c
     JOIN sorteos s ON c.sorteo_id = s.id
     LEFT JOIN inscripciones i ON i.sorteo_id = c.sorteo_id AND i.cedula = c.cedula

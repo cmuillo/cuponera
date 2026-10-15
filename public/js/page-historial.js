@@ -115,7 +115,7 @@ const PageHistorial = {
                   </td>
                   <td><span class="d-inline-block text-truncate" style="max-width:130px" title="${escHtml(c.sorteo_nombre)}">${escHtml(c.sorteo_nombre)}</span></td>
                   <td>${escHtml(c.nombre_persona || '—')}
-                    ${c.acompanante ? '<span class="badge bg-light text-dark border ms-1" title="Asiste con acompañante"><i class="bi bi-people-fill"></i></span>' : ''}
+                    ${c.acompanante ? `<span class="badge bg-light text-dark border ms-1" title="Asiste con acompañante: ${escHtml(c.acompanante_nombre || 'sin nombre')}"><i class="bi bi-people-fill"></i></span>` : ''}
                   </td>
                   <td>${escHtml(c.cedula)}</td>
                   <td>${escHtml(c.celular)}</td>

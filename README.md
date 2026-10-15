@@ -26,7 +26,9 @@ https://tu-dominio/inscripcion?sorteo=<id>
 Esa ventana no requiere login y tiene dos pestañas:
 
 1. **Inscripción** — Nombre, cédula, teléfono y casilla *"Asistiré con un acompañante"*.
-   Al enviar se genera automáticamente **1 cupón** (estado de pago *confirmado*).
+   Al marcar esa casilla se abre un campo para escribir el **nombre del acompañante**, que es
+   obligatorio mientras la casilla esté marcada. Al enviar se genera automáticamente **1 cupón**
+   (estado de pago *confirmado*).
 2. **Comprar cupones** — Requiere estar inscrito previamente: la persona digita su cédula, el
    sistema la valida y muestra los paquetes configurados (por defecto ₡5.000 = 1 cupón,
    ₡8.000 = 2 cupones, ₡10.000 = 3 cupones). Tras *Generar cupones* aparece el botón
@@ -53,7 +55,8 @@ Al crear o editar un sorteo con inscripción pública se elige entre:
 
 En *Reportes* el botón **Exportar Excel** genera un `.xlsx` con dos hojas:
 
-- **Participantes** — Nombre, cédula, teléfono, **acompañante**, cantidad de cupones, códigos y sorteo.
+- **Participantes** — Nombre, cédula, teléfono, **acompañante**, **nombre del acompañante**,
+  cantidad de cupones, códigos y sorteo.
 - **Resumen** — Totales de cupones, participantes, acompañantes y **personas a asistir**
   (participantes + acompañantes).
 
@@ -81,6 +84,7 @@ Railway → tu proyecto → **New → Database → Add PostgreSQL** (inyecta `DA
 npm install
 cp .env.example .env   # Editar con datos locales
 npm run dev            # http://localhost:3000
+npm test               # Pruebas unitarias (node:test)
 ```
 
 ## 🔐 Seguridad

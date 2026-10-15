@@ -42,6 +42,16 @@ const Inscripcion = {
         '<i class="bi bi-shield-check me-1"></i>Esta actividad es solo para personas del listado autorizado. Su cédula será validada.';
     }
 
+    const acompCheck = document.getElementById('inscAcompanante');
+    acompCheck.addEventListener('change', () => {
+      const box = document.getElementById('inscAcompananteBox');
+      box.classList.toggle('d-none', !acompCheck.checked);
+      const input = document.getElementById('inscAcompananteNombre');
+      input.required = acompCheck.checked;
+      if (acompCheck.checked) input.focus();
+      else input.value = '';
+    });
+
     document.getElementById('inscForm').addEventListener('submit', (e) => {
       e.preventDefault();
       this.inscribir();
@@ -87,6 +97,7 @@ const Inscripcion = {
         cedula: document.getElementById('inscCedula').value.trim(),
         celular: document.getElementById('inscCelular').value.trim(),
         acompanante: document.getElementById('inscAcompanante').checked,
+        acompanante_nombre: document.getElementById('inscAcompananteNombre').value.trim(),
       });
 
       document.getElementById('inscForm').classList.add('d-none');
@@ -103,11 +114,13 @@ const Inscripcion = {
             <div><strong>Nombre:</strong> ${escHtml(data.inscripcion.nombre)}</div>
             <div><strong>Cédula:</strong> ${escHtml(data.inscripcion.cedula)}</div>
             <div><strong>Teléfono:</strong> ${escHtml(data.inscripcion.celular)}</div>
-            <div><strong>Acompañante:</strong> ${data.inscripcion.acompanante ? 'Sí' : 'No'}</div>
+            <div><strong>Acompañante:</strong> ${data.inscripcion.acompanante
+              ? escHtml(data.inscripcion.acompanante_nombre) : 'No'}</div>
           </div>
+          ${this.config.compras_adicionales_habilitadas !== false ? `
           <button class="btn btn-outline-primary" onclick="Inscripcion.irACompra()">
             <i class="bi bi-cart-plus me-1"></i>Comprar cupones adicionales
-          </button>
+          </button>` : ''}
         </div>`;
       showToast('Inscripción registrada correctamente', 'success');
     } catch (err) {
