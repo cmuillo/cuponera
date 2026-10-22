@@ -124,6 +124,9 @@ async function initDB() {
       ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS precio_espacio INTEGER
     `);
     await pool.query(`
+      ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS whatsapp_comprobantes VARCHAR(25)
+    `);
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS reservas_cupo (
         id SERIAL PRIMARY KEY,
         sorteo_id INTEGER NOT NULL REFERENCES sorteos(id) ON DELETE CASCADE,

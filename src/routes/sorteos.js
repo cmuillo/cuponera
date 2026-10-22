@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { parseTipoInscripcion } = require('../utils/reservas-cupo');
+const { normalizeCelular } = require('../utils/cupones');
 
 const router = express.Router();
 
@@ -64,16 +65,22 @@ router.post('/', async (req, res) => {
   if (tipoInscripcion.error) {
     return res.status(400).json({ error: tipoInscripcion.error });
   }
+  const whatsappComprobantes = req.body.whatsapp_comprobantes
+    ? normalizeCelular(req.body.whatsapp_comprobantes)
+    : null;
+  if (req.body.whatsapp_comprobantes && !whatsappComprobantes) {
+    return res.status(400).json({ error: 'Formato de número de WhatsApp inválido.' });
+  }
   try {
     const result = await pool.query(
       `INSERT INTO sorteos (
          nombre, descripcion, fecha_sorteo, activo, monto_minimo, modo_inscripcion, restringir_padron,
-         tipo_inscripcion, capacidad_total, precio_espacio
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+         tipo_inscripcion, capacidad_total, precio_espacio, whatsapp_comprobantes
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [
         nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion,
         restringirPadron, tipoInscripcion.tipo_inscripcion, tipoInscripcion.capacidad_total,
-        tipoInscripcion.precio_espacio,
+        tipoInscripcion.precio_espacio, whatsappComprobantes,
       ]
     );
     res.status(201).json(result.rows[0]);
@@ -100,6 +107,12 @@ router.put('/:id', async (req, res) => {
   });
   if (tipoInscripcion.error) {
     return res.status(400).json({ error: tipoInscripcion.error });
+  }
+  const whatsappComprobantes = req.body.whatsapp_comprobantes
+    ? normalizeCelular(req.body.whatsapp_comprobantes)
+    : null;
+  if (req.body.whatsapp_comprobantes && !whatsappComprobantes) {
+    return res.status(400).json({ error: 'Formato de número de WhatsApp inválido.' });
   }
   const client = await pool.connect();
   let transactionStarted = false;
@@ -143,12 +156,12 @@ router.put('/:id', async (req, res) => {
     const result = await client.query(
       `UPDATE sorteos SET nombre=$1, descripcion=$2, fecha_sorteo=$3, activo=$4, monto_minimo=$5,
          modo_inscripcion=$6, restringir_padron=$7, tipo_inscripcion=$8, capacidad_total=$9,
-         precio_espacio=$10, updated_at=NOW()
-       WHERE id=$11 RETURNING *`,
+         precio_espacio=$10, whatsapp_comprobantes=$11, updated_at=NOW()
+       WHERE id=$12 RETURNING *`,
       [
         nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion,
         restringirPadron, tipoInscripcion.tipo_inscripcion, tipoInscripcion.capacidad_total,
-        tipoInscripcion.precio_espacio, id,
+        tipoInscripcion.precio_espacio, whatsappComprobantes, id,
       ]
     );
     if (result.rows.length === 0) {

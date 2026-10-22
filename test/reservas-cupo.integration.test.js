@@ -168,6 +168,42 @@ test('impide reducir el cupo por debajo de los espacios reservados y conserva lo
   assert.equal(savedReservation.rows[0].monto_total, 5000);
 });
 
+test('normaliza y valida el WhatsApp configurado por actividad', async () => {
+  const created = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad con WhatsApp propio',
+      fecha_sorteo: '2027-01-16',
+      activo: true,
+      whatsapp_comprobantes: '8800 1234',
+    }),
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.whatsapp_comprobantes, '88001234');
+
+  const updated = await api(`/api/sorteos/${created.body.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      ...created.body,
+      whatsapp_comprobantes: '+506 8111-2222',
+    }),
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.whatsapp_comprobantes, '+5068111-2222');
+
+  const invalid = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad con WhatsApp inválido',
+      fecha_sorteo: '2027-01-17',
+      activo: true,
+      whatsapp_comprobantes: 'abc',
+    }),
+  });
+  assert.equal(invalid.status, 400);
+  assert.match(invalid.body.error, /WhatsApp inválido/i);
+});
+
 test('rechaza convertir una actividad limitada con reservas en normal', async () => {
   const created = await api('/api/sorteos', {
     method: 'POST',
