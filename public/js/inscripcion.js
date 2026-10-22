@@ -160,6 +160,8 @@ const Inscripcion = {
     if (!persona) return;
     document.getElementById('inscNombre').value = persona.nombre;
     document.getElementById('inscCedula').value = persona.cedula;
+    document.getElementById('inscNombre').disabled = true;
+    document.getElementById('inscCedula').disabled = true;
     document.getElementById('inscPadronSearch').value = persona.nombre;
     document.getElementById('inscPadronResults').classList.add('d-none');
     document.getElementById('inscCelular').focus();
