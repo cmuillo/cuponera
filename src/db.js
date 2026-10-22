@@ -115,7 +115,37 @@ async function initDB() {
       ALTER TABLE inscripciones ADD COLUMN IF NOT EXISTS acompanante_nombre VARCHAR(255)
     `);
     await pool.query(`
+      ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS tipo_inscripcion VARCHAR(20) NOT NULL DEFAULT 'normal'
+    `);
+    await pool.query(`
+      ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS capacidad_total INTEGER
+    `);
+    await pool.query(`
+      ALTER TABLE sorteos ADD COLUMN IF NOT EXISTS precio_espacio INTEGER
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reservas_cupo (
+        id SERIAL PRIMARY KEY,
+        sorteo_id INTEGER NOT NULL REFERENCES sorteos(id) ON DELETE CASCADE,
+        cedula VARCHAR(25) NOT NULL,
+        nombre VARCHAR(255),
+        celular VARCHAR(25) NOT NULL,
+        acompanante BOOLEAN DEFAULT FALSE,
+        acompanante_nombre VARCHAR(255),
+        espacios_reservados INTEGER NOT NULL,
+        monto_total INTEGER NOT NULL,
+        estado_pago VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+          CHECK (estado_pago IN ('pendiente', 'confirmado')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (sorteo_id, cedula)
+      )
+    `);
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_cupones_sorteo_cedula ON cupones (sorteo_id, cedula)
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_reservas_cupo_sorteo_estado_pago
+        ON reservas_cupo (sorteo_id, estado_pago)
     `);
 
     // Configuración por defecto
