@@ -32,7 +32,13 @@ const Inscripcion = {
 
     this.renderHeader();
     document.getElementById('inscBody').classList.remove('d-none');
-    if (this.config.compras_adicionales_habilitadas !== false) {
+    if (this.sorteo.tipo_inscripcion === 'cupo_limitado') {
+      document.getElementById('compraTabItem').remove();
+      document.getElementById('tabCompra').remove();
+      document.getElementById('inscBtn').innerHTML =
+        '<i class="bi bi-calendar-check me-1"></i>Reservar espacios';
+      this.renderReservaResumen();
+    } else if (this.config.compras_adicionales_habilitadas !== false) {
       document.getElementById('compraTabItem').classList.remove('d-none');
     } else {
       document.getElementById('tabCompra').remove();
@@ -56,6 +62,7 @@ const Inscripcion = {
       input.required = acompCheck.checked;
       if (acompCheck.checked) input.focus();
       else input.value = '';
+      this.renderReservaResumen();
     });
 
     document.getElementById('inscForm').addEventListener('submit', (e) => {
@@ -77,7 +84,36 @@ const Inscripcion = {
     document.getElementById('inscHeader').innerHTML = `
       <h1 class="h3 fw-bold mb-1">${escHtml(this.sorteo.nombre)}</h1>
       <div class="text-muted"><i class="bi bi-calendar3 me-1"></i>${formatDate(this.sorteo.fecha_sorteo)}</div>
-      ${this.sorteo.descripcion ? `<p class="text-muted small mt-2 mb-0">${escHtml(this.sorteo.descripcion)}</p>` : ''}`;
+      ${this.sorteo.descripcion ? `<p class="text-muted small mt-2 mb-0">${escHtml(this.sorteo.descripcion)}</p>` : ''}
+      ${this.sorteo.tipo_inscripcion === 'cupo_limitado' ? this.cupoHtml() : ''}`;
+  },
+
+  cupoHtml() {
+    const ocupados = this.sorteo.espacios_ocupados || 0;
+    const total = this.sorteo.capacidad_total || 0;
+    const disponibles = this.sorteo.espacios_disponibles || 0;
+    const porcentaje = total ? Math.min(100, (ocupados / total) * 100) : 0;
+    return `<div class="mt-3 text-start">
+      <div class="d-flex justify-content-between small mb-1">
+        <span class="fw-semibold">Disponibilidad</span>
+        <span>${disponibles} de ${total} espacios disponibles</span>
+      </div>
+      <div class="progress" role="progressbar" aria-label="Espacios reservados"
+           aria-valuenow="${ocupados}" aria-valuemin="0" aria-valuemax="${total}">
+        <div class="progress-bar" style="width:${porcentaje}%"></div>
+      </div>
+    </div>`;
+  },
+
+  renderReservaResumen() {
+    if (this.sorteo?.tipo_inscripcion !== 'cupo_limitado') return;
+    const acompanante = document.getElementById('inscAcompanante').checked;
+    const espacios = acompanante ? 2 : 1;
+    const monto = espacios * this.sorteo.precio_espacio;
+    const el = document.getElementById('inscReservaResumen');
+    el.innerHTML = `<strong>Reserva:</strong> ${espacios} ${espacios === 1 ? 'espacio' : 'espacios'} ·
+      Total a pagar: <strong>₡${formatColones(monto)}</strong>`;
+    el.classList.remove('d-none');
   },
 
   fatal(msg) {
@@ -149,6 +185,11 @@ const Inscripcion = {
       });
 
       document.getElementById('inscForm').classList.add('d-none');
+      if (data.reserva) {
+        this.sorteo = { ...this.sorteo, ...data.sorteo };
+        this.renderHeader();
+        return this.renderReservaResult(data);
+      }
       this.cedulaInscrita = data.inscripcion.cedula;
       const res = document.getElementById('inscResult');
       res.classList.remove('d-none');
@@ -179,6 +220,40 @@ const Inscripcion = {
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-ticket-perforated me-1"></i>Inscribirme y generar mi cupón';
     }
+  },
+
+  renderReservaResult(data) {
+    const reserva = data.reserva;
+    const texto =
+      `🧾 *Comprobante de reserva — ${data.sorteo.nombre}*\n\n` +
+      `👤 ${reserva.nombre}\n` +
+      `🪪 Cédula: ${reserva.cedula}\n` +
+      `📱 Teléfono: ${reserva.celular}\n` +
+      `👥 Espacios reservados: ${reserva.espacios_reservados}\n` +
+      `💵 Monto: ₡${formatColones(reserva.monto_total)}\n\n` +
+      'Adjunto el comprobante de pago. ¡Gracias!';
+    const comprobante = data.whatsapp_comprobantes
+      ? `<a href="${buildWaLink(data.whatsapp_comprobantes, texto)}" target="_blank" rel="noopener noreferrer"
+            class="btn btn-success btn-lg w-100 py-3">
+           <i class="bi bi-whatsapp me-2"></i>Enviar comprobante de pago
+         </a>`
+      : '<div class="alert alert-warning mb-0">Contacte a la organización para enviar su comprobante de pago.</div>';
+    const res = document.getElementById('inscResult');
+    res.classList.remove('d-none');
+    res.innerHTML = `
+      <div class="text-center">
+        <div class="display-6 mb-2">⏳</div>
+        <h2 class="h5 fw-bold">¡Reserva registrada!</h2>
+        <div class="alert alert-warning text-start small">
+          Su reserva está <strong>pendiente de pago</strong>. Envíe el comprobante para confirmarla.
+        </div>
+        <div class="alert alert-light border text-start small">
+          <div><strong>Espacios reservados:</strong> ${reserva.espacios_reservados}</div>
+          <div><strong>Total a pagar:</strong> ₡${formatColones(reserva.monto_total)}</div>
+        </div>
+        ${comprobante}
+      </div>`;
+    showToast('Reserva registrada. Envíe su comprobante de pago.', 'success');
   },
 
   irACompra() {

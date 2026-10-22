@@ -208,3 +208,145 @@ test('no elimina una actividad cuando una reserva se confirma mientras espera el
     lockClient.release();
   }
 });
+
+test('crea una reserva pendiente de dos espacios sin inscripción ni cupón', async () => {
+  const created = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad pública de dos espacios',
+      fecha_sorteo: '2027-01-17',
+      activo: true,
+      modo_inscripcion: true,
+      tipo_inscripcion: 'cupo_limitado',
+      capacidad_total: 2,
+      precio_espacio: 5000,
+    }),
+  });
+  assert.equal(created.status, 201);
+
+  const reservationResponse = await api('/api/inscripciones', {
+    method: 'POST',
+    body: JSON.stringify({
+      sorteo_id: created.body.id,
+      cedula: '444',
+      nombre: 'Diana',
+      celular: '85555555',
+      acompanante: true,
+      acompanante_nombre: 'Ernesto',
+    }),
+  });
+
+  assert.equal(reservationResponse.status, 201);
+  assert.equal(reservationResponse.body.reserva.estado_pago, 'pendiente');
+  assert.equal(reservationResponse.body.reserva.espacios_reservados, 2);
+  assert.equal(reservationResponse.body.reserva.monto_total, 10000);
+  assert.ok(Object.hasOwn(reservationResponse.body, 'whatsapp_comprobantes'));
+
+  const [cupones, inscripciones, reserva] = await Promise.all([
+    pool.query('SELECT COUNT(*)::int AS total FROM cupones WHERE sorteo_id = $1', [created.body.id]),
+    pool.query('SELECT COUNT(*)::int AS total FROM inscripciones WHERE sorteo_id = $1', [created.body.id]),
+    pool.query('SELECT * FROM reservas_cupo WHERE sorteo_id = $1 AND cedula = $2', [created.body.id, '444']),
+  ]);
+  assert.equal(cupones.rows[0].total, 0);
+  assert.equal(inscripciones.rows[0].total, 0);
+  assert.equal(reserva.rows.length, 1);
+});
+
+test('solo permite una reserva concurrente para el último espacio', async () => {
+  const created = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad con último espacio',
+      fecha_sorteo: '2027-01-18',
+      activo: true,
+      modo_inscripcion: true,
+      tipo_inscripcion: 'cupo_limitado',
+      capacidad_total: 2,
+      precio_espacio: 5000,
+    }),
+  });
+  assert.equal(created.status, 201);
+  await pool.query(
+    `INSERT INTO reservas_cupo
+       (sorteo_id, cedula, nombre, celular, espacios_reservados, monto_total)
+     VALUES ($1, '555', 'Francisca', '84444444', 1, 5000)`,
+    [created.body.id]
+  );
+
+  const reserva = (cedula, nombre) => api('/api/inscripciones', {
+    method: 'POST',
+    body: JSON.stringify({
+      sorteo_id: created.body.id,
+      cedula,
+      nombre,
+      celular: '83333333',
+      acompanante: false,
+      acompanante_nombre: '',
+    }),
+  });
+  const responses = await Promise.all([
+    reserva('556', 'Gabriel'),
+    reserva('557', 'Helena'),
+  ]);
+  assert.equal(responses.filter(response => response.status === 201).length, 1);
+  assert.equal(responses.filter(response => response.status === 409).length, 1);
+
+  const ocupados = await pool.query(
+    'SELECT COALESCE(SUM(espacios_reservados), 0)::int AS total FROM reservas_cupo WHERE sorteo_id = $1',
+    [created.body.id]
+  );
+  assert.equal(ocupados.rows[0].total, 2);
+});
+
+test('rechaza acompañante cuando queda un espacio y oculta cédulas reservadas del padrón', async () => {
+  const created = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad limitada con padrón',
+      fecha_sorteo: '2027-01-19',
+      activo: true,
+      modo_inscripcion: true,
+      restringir_padron: true,
+      tipo_inscripcion: 'cupo_limitado',
+      capacidad_total: 3,
+      precio_espacio: 5000,
+    }),
+  });
+  assert.equal(created.status, 201);
+  await pool.query(
+    `INSERT INTO sorteo_padron (sorteo_id, cedula, nombre)
+     VALUES ($1, '666', 'Inés Reservada'),
+            ($1, '667', 'Ismael Disponible'),
+            ($1, '668', 'Irene Acompañada')`,
+    [created.body.id]
+  );
+  await pool.query(
+    `INSERT INTO reservas_cupo
+       (sorteo_id, cedula, nombre, celular, acompanante, acompanante_nombre, espacios_reservados, monto_total)
+     VALUES ($1, '666', 'Inés Reservada', '82222222', true, 'Laura', 2, 10000)`,
+    [created.body.id]
+  );
+
+  const padron = await api(`/api/inscripciones/padron?sorteo_id=${created.body.id}&buscar=In`);
+  assert.equal(padron.status, 200);
+  assert.deepEqual(padron.body.map(persona => persona.cedula), []);
+
+  const insufficient = await api('/api/inscripciones', {
+    method: 'POST',
+    body: JSON.stringify({
+      sorteo_id: created.body.id,
+      cedula: '668',
+      nombre: 'Irene Acompañada',
+      celular: '81111111',
+      acompanante: true,
+      acompanante_nombre: 'José',
+    }),
+  });
+  assert.equal(insufficient.status, 409);
+
+  const rejected = await pool.query(
+    'SELECT COUNT(*)::int AS total FROM reservas_cupo WHERE sorteo_id = $1 AND cedula = $2',
+    [created.body.id, '668']
+  );
+  assert.equal(rejected.rows[0].total, 0);
+});

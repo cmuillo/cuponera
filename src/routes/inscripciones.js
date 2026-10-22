@@ -4,6 +4,7 @@ const { pool } = require('../db');
 const { getConfig } = require('../utils/config');
 const { generateUniqueCouponCode, normalizeCelular } = require('../utils/cupones');
 const { parseAcompanante, normalizePadronSearch } = require('../utils/inscripciones');
+const { calcularReserva } = require('../utils/reservas-cupo');
 
 const router = express.Router();
 
@@ -22,8 +23,11 @@ function cleanCedula(cedula) {
 }
 
 /** Carga el sorteo verificando que esté habilitado para inscripción pública. */
-async function loadSorteoInscripcion(sorteoId) {
-  const result = await pool.query('SELECT * FROM sorteos WHERE id = $1', [sorteoId]);
+async function loadSorteoInscripcion(sorteoId, queryable = pool, forUpdate = false) {
+  const result = await queryable.query(
+    `SELECT * FROM sorteos WHERE id = $1${forUpdate ? ' FOR UPDATE' : ''}`,
+    [sorteoId]
+  );
   if (result.rows.length === 0) {
     return { error: 'La actividad no existe.', status: 404 };
   }
@@ -52,6 +56,21 @@ router.get('/sorteo/:id', async (req, res) => {
       descripcion: sorteo.descripcion,
       fecha_sorteo: sorteo.fecha_sorteo,
       restringir_padron: sorteo.restringir_padron,
+      tipo_inscripcion: sorteo.tipo_inscripcion,
+      capacidad_total: sorteo.capacidad_total,
+      precio_espacio: sorteo.precio_espacio,
+      espacios_ocupados: sorteo.tipo_inscripcion === 'cupo_limitado'
+        ? (await pool.query(
+          'SELECT COALESCE(SUM(espacios_reservados), 0)::int AS total FROM reservas_cupo WHERE sorteo_id = $1',
+          [sorteo.id]
+        )).rows[0].total
+        : null,
+      espacios_disponibles: sorteo.tipo_inscripcion === 'cupo_limitado'
+        ? sorteo.capacidad_total - (await pool.query(
+          'SELECT COALESCE(SUM(espacios_reservados), 0)::int AS total FROM reservas_cupo WHERE sorteo_id = $1',
+          [sorteo.id]
+        )).rows[0].total
+        : null,
     });
   } catch (err) {
     console.error(err);
@@ -82,6 +101,10 @@ router.get('/padron', async (req, res) => {
          AND NOT EXISTS (
            SELECT 1 FROM inscripciones i
            WHERE i.sorteo_id = p.sorteo_id AND i.cedula = p.cedula
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM reservas_cupo r
+           WHERE r.sorteo_id = p.sorteo_id AND r.cedula = p.cedula
          )
        ORDER BY p.nombre, p.cedula
        LIMIT 10`,
@@ -155,27 +178,92 @@ router.post('/', async (req, res) => {
   }
 
   const client = await pool.connect();
+  let transactionStarted = false;
   try {
-    const { sorteo, error, status } = await loadSorteoInscripcion(sorteoId);
-    if (error) return res.status(status).json({ error });
+    await client.query('BEGIN');
+    transactionStarted = true;
+    const { sorteo, error, status } = await loadSorteoInscripcion(sorteoId, client, true);
+    if (error) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+      return res.status(status).json({ error });
+    }
 
     if (sorteo.restringir_padron) {
-      const autorizado = await pool.query(
+      const autorizado = await client.query(
         'SELECT id FROM sorteo_padron WHERE sorteo_id = $1 AND cedula = $2',
         [sorteo.id, cedula]
       );
       if (autorizado.rows.length === 0) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
         return res.status(403).json({
           error: 'La cédula ingresada no se encuentra en el listado autorizado para esta actividad.',
         });
       }
     }
 
-    const yaInscrito = await pool.query(
+    if (sorteo.tipo_inscripcion === 'cupo_limitado') {
+      const yaReservado = await client.query(
+        'SELECT id FROM reservas_cupo WHERE sorteo_id = $1 AND cedula = $2',
+        [sorteo.id, cedula]
+      );
+      if (yaReservado.rows.length > 0) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+        return res.status(409).json({ error: 'Esta cédula ya tiene una reserva para la actividad.' });
+      }
+
+      const reservaCalculada = calcularReserva(acomp.acompanante, sorteo.precio_espacio);
+      const ocupacion = await client.query(
+        `SELECT COALESCE(SUM(espacios_reservados), 0)::int AS espacios_ocupados
+         FROM reservas_cupo WHERE sorteo_id = $1`,
+        [sorteo.id]
+      );
+      const espaciosDisponibles = sorteo.capacidad_total - ocupacion.rows[0].espacios_ocupados;
+      if (reservaCalculada.espacios_reservados > espaciosDisponibles) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+        return res.status(409).json({ error: 'No hay espacios suficientes para esta reserva.' });
+      }
+
+      const reservation = await client.query(
+        `INSERT INTO reservas_cupo (
+           sorteo_id, cedula, nombre, celular, acompanante, acompanante_nombre,
+           espacios_reservados, monto_total
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [
+          sorteo.id, cedula, nombre, celular, acomp.acompanante, acomp.acompanante_nombre,
+          reservaCalculada.espacios_reservados, reservaCalculada.monto_total,
+        ]
+      );
+      await client.query('COMMIT');
+      transactionStarted = false;
+      const config = await getConfig();
+      return res.status(201).json({
+        reserva: reservation.rows[0],
+        sorteo: {
+          id: sorteo.id,
+          nombre: sorteo.nombre,
+          descripcion: sorteo.descripcion,
+          fecha_sorteo: sorteo.fecha_sorteo,
+          tipo_inscripcion: sorteo.tipo_inscripcion,
+          capacidad_total: sorteo.capacidad_total,
+          precio_espacio: sorteo.precio_espacio,
+          espacios_ocupados: ocupacion.rows[0].espacios_ocupados + reservaCalculada.espacios_reservados,
+          espacios_disponibles: espaciosDisponibles - reservaCalculada.espacios_reservados,
+        },
+        whatsapp_comprobantes: config.whatsapp_comprobantes,
+      });
+    }
+
+    const yaInscrito = await client.query(
       'SELECT id FROM inscripciones WHERE sorteo_id = $1 AND cedula = $2',
       [sorteo.id, cedula]
     );
     if (yaInscrito.rows.length > 0) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
       return res.status(409).json({
         error: 'Esta cédula ya está inscrita. Use la pestaña "Comprar cupones" para obtener cupones adicionales.',
       });
@@ -183,7 +271,6 @@ router.post('/', async (req, res) => {
 
     const codigo = await generateUniqueCouponCode(sorteo.id);
 
-    await client.query('BEGIN');
     await client.query(
       `INSERT INTO inscripciones (sorteo_id, cedula, nombre, celular, acompanante, acompanante_nombre)
        VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -195,6 +282,7 @@ router.post('/', async (req, res) => {
       [codigo, sorteo.id, celular, cedula, nombre]
     );
     await client.query('COMMIT');
+    transactionStarted = false;
 
     res.status(201).json({
       inscripcion: {
@@ -213,7 +301,7 @@ router.post('/', async (req, res) => {
       cupones: [cupon.rows[0]],
     });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    if (transactionStarted) await client.query('ROLLBACK').catch(() => {});
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Esta cédula ya está inscrita en la actividad.' });
     }
