@@ -12,6 +12,7 @@ const cuponRoutes = require('./src/routes/cupones');
 const reporteRoutes = require('./src/routes/reportes');
 const configRoutes = require('./src/routes/config');
 const inscripcionRoutes = require('./src/routes/inscripciones');
+const reservaCupoRoutes = require('./src/routes/reservas-cupo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -45,6 +46,7 @@ app.use('/api/cupones', cuponRoutes);
 app.use('/api/reportes', reporteRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/inscripciones', inscripcionRoutes);
+app.use('/api/reservas-cupo', reservaCupoRoutes);
 
 // Ventana pública de inscripción (sin autenticación)
 app.get('/inscripcion', (req, res) => {

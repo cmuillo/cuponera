@@ -26,7 +26,11 @@ async function api(path, options = {}) {
       ...options.headers,
     },
   });
-  return { status: response.status, body: await response.json() };
+  const contentType = response.headers.get('content-type') || '';
+  return {
+    status: response.status,
+    body: contentType.includes('application/json') ? await response.json() : await response.text(),
+  };
 }
 
 async function waitForServer() {
@@ -430,4 +434,54 @@ test('no reduce la capacidad por debajo de una reserva pública simultánea', as
     await lockClient.query('ROLLBACK').catch(() => {});
     lockClient.release();
   }
+});
+
+test('administra reservas sin convertirlas en cupones y libera sus espacios al eliminarlas', async () => {
+  const listing = await api(`/api/reservas-cupo?sorteoId=${sorteo.id}`);
+  assert.equal(listing.status, 200);
+  assert.ok(Array.isArray(listing.body));
+
+  const ana = listing.body.find(reserva => reserva.cedula === '111');
+  const bea = listing.body.find(reserva => reserva.cedula === '222');
+  assert.ok(ana);
+  assert.ok(bea);
+  assert.equal(ana.espacios_reservados, 1);
+  assert.equal(ana.monto_total, 5000);
+  assert.equal(ana.estado_pago, 'pendiente');
+  assert.equal(ana.sorteo_nombre, 'Actividad con cupo');
+
+  const confirmation = await api(`/api/reservas-cupo/${ana.id}/pago`, {
+    method: 'PATCH',
+    body: JSON.stringify({}),
+  });
+  assert.equal(confirmation.status, 200);
+  assert.equal(confirmation.body.estado_pago, 'confirmado');
+
+  const states = await pool.query(
+    'SELECT cedula, estado_pago FROM reservas_cupo WHERE id = ANY($1::int[]) ORDER BY cedula',
+    [[ana.id, bea.id]]
+  );
+  assert.deepEqual(states.rows, [
+    { cedula: '111', estado_pago: 'confirmado' },
+    { cedula: '222', estado_pago: 'pendiente' },
+  ]);
+
+  const deletion = await api(`/api/reservas-cupo/${bea.id}`, { method: 'DELETE' });
+  assert.equal(deletion.status, 200);
+
+  const activity = await api('/api/sorteos');
+  const listed = activity.body.find(item => item.id === sorteo.id);
+  assert.equal(listed.espacios_ocupados, 1);
+  assert.equal(listed.espacios_disponibles, 3);
+
+  const reservations = await pool.query(
+    'SELECT COUNT(*)::int AS total FROM reservas_cupo WHERE sorteo_id = $1',
+    [sorteo.id]
+  );
+  const coupons = await pool.query(
+    'SELECT COUNT(*)::int AS total FROM cupones WHERE sorteo_id = $1',
+    [sorteo.id]
+  );
+  assert.equal(reservations.rows[0].total, 1);
+  assert.equal(coupons.rows[0].total, 0);
 });

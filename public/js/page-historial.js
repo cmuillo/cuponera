@@ -11,7 +11,7 @@ const PageHistorial = {
     ].join('');
 
     container.innerHTML = `
-      <h1 class="page-title"><i class="bi bi-clock-history"></i>Historial de Cupones</h1>
+      <h1 class="page-title"><i class="bi bi-clock-history"></i>Historial</h1>
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-2 align-items-end">
@@ -46,7 +46,7 @@ const PageHistorial = {
 
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Cupones <span id="cuponesCount" class="badge bg-primary ms-1">—</span></span>
+          <span>Cupones y reservas <span id="cuponesCount" class="badge bg-primary ms-1">—</span></span>
         </div>
         <div class="card-body p-0">
           <div id="historialTable" class="p-3">
@@ -83,11 +83,19 @@ const PageHistorial = {
     if (estadoPago) params.set('estadoPago', estadoPago);
 
     try {
-      const cupones = await API.get(`/api/cupones?${params.toString()}`);
-      countEl.textContent = cupones.length;
+      const query = params.toString();
+      const [cupones, reservas] = await Promise.all([
+        API.get(`/api/cupones?${query}`),
+        API.get(`/api/reservas-cupo?${query}`),
+      ]);
+      const registros = [
+        ...cupones.map(cupon => ({ ...cupon, tipo_registro: 'cupon' })),
+        ...reservas.map(reserva => ({ ...reserva, tipo_registro: 'reserva' })),
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      countEl.textContent = registros.length;
 
-      if (cupones.length === 0) {
-        el.innerHTML = '<div class="empty-state"><i class="bi bi-search"></i>No se encontraron cupones.</div>';
+      if (registros.length === 0) {
+        el.innerHTML = '<div class="empty-state"><i class="bi bi-search"></i>No se encontraron registros.</div>';
         return;
       }
 
@@ -96,7 +104,7 @@ const PageHistorial = {
           <table class="table table-hover mb-0">
             <thead>
               <tr>
-                <th>Código</th>
+                <th>Registro</th>
                 <th>Sorteo</th>
                 <th>Titular</th>
                 <th>Cédula</th>
@@ -108,41 +116,7 @@ const PageHistorial = {
               </tr>
             </thead>
             <tbody>
-              ${cupones.map(c => `
-                <tr>
-                  <td><code class="fw-bold text-primary">${escHtml(c.codigo)}</code>
-                    ${c.ganador ? '<span class="badge bg-warning text-dark ms-1"><i class="bi bi-trophy-fill"></i> Ganador</span>' : ''}
-                  </td>
-                  <td><span class="d-inline-block text-truncate" style="max-width:130px" title="${escHtml(c.sorteo_nombre)}">${escHtml(c.sorteo_nombre)}</span></td>
-                  <td>${escHtml(c.nombre_persona || '—')}
-                    ${c.acompanante ? `<span class="badge bg-light text-dark border ms-1" title="Asiste con acompañante: ${escHtml(c.acompanante_nombre || 'sin nombre')}"><i class="bi bi-people-fill"></i></span>` : ''}
-                  </td>
-                  <td>${escHtml(c.cedula)}</td>
-                  <td>${escHtml(c.celular)}</td>
-                  <td>${PageHistorial.origenBadge(c.origen)}</td>
-                  <td>
-                    ${c.estado_pago === 'pendiente'
-                      ? '<span class="badge bg-warning text-dark">Pendiente</span>'
-                      : '<span class="badge bg-success">Confirmado</span>'}
-                  </td>
-                  <td class="text-muted small">${new Date(c.created_at).toLocaleDateString('es-ES')}</td>
-                  <td class="text-nowrap">
-                    ${c.estado_pago === 'pendiente'
-                      ? `<button class="btn btn-success btn-sm me-1" title="Confirmar pago"
-                           onclick="PageHistorial.setPago(${c.id}, 'confirmado')">
-                           <i class="bi bi-cash-coin"></i>
-                         </button>`
-                      : ''}
-                    <a href="${buildWaLink(c.celular, buildCuponWaText(c))}" target="_blank" rel="noopener noreferrer"
-                       class="btn btn-whatsapp btn-sm me-1" title="Enviar por WhatsApp">
-                      <i class="bi bi-whatsapp"></i>
-                    </a>
-                    <button class="btn btn-outline-danger btn-sm" title="Eliminar cupón"
-                      onclick="PageHistorial.deleteCupon(${c.id}, '${escHtml(c.codigo).replace(/'/g,"\\'")}')">
-                      <i class="bi bi-trash"></i>
-                    </button>
-                  </td>
-                </tr>`).join('')}
+              ${registros.map(registro => PageHistorial.renderRegistro(registro)).join('')}
             </tbody>
           </table>
         </div>`;
@@ -159,10 +133,108 @@ const PageHistorial = {
     return mapa[origen] || '<span class="badge bg-secondary">Manual</span>';
   },
 
+  renderRegistro(registro) {
+    if (registro.tipo_registro === 'reserva') {
+      const nombre = escHtml(registro.nombre || '—');
+      const acompanante = registro.acompanante
+        ? `<span class="badge bg-light text-dark border ms-1" title="Acompañante: ${escHtml(registro.acompanante_nombre || 'sin nombre')}"><i class="bi bi-people-fill"></i></span>`
+        : '';
+      const pago = registro.estado_pago === 'pendiente'
+        ? '<span class="badge bg-warning text-dark">Pendiente</span>'
+        : '<span class="badge bg-success">Confirmado</span>';
+      const mensaje = registro.estado_pago === 'pendiente'
+        ? PageHistorial.recordatorioReserva(registro)
+        : PageHistorial.pagoVerificadoReserva(registro);
+      return `
+        <tr>
+          <td><span class="badge bg-info text-dark">Reserva</span>
+            <div class="small text-muted mt-1">${registro.espacios_reservados} ${registro.espacios_reservados === 1 ? 'espacio' : 'espacios'} · ₡${Number(registro.monto_total).toLocaleString('es-ES')}</div>
+          </td>
+          <td><span class="d-inline-block text-truncate" style="max-width:130px" title="${escHtml(registro.sorteo_nombre)}">${escHtml(registro.sorteo_nombre)}</span></td>
+          <td>${nombre}${acompanante}</td>
+          <td>${escHtml(registro.cedula)}</td>
+          <td>${escHtml(registro.celular)}</td>
+          <td><span class="badge bg-info text-dark">Cupo limitado</span></td>
+          <td>${pago}</td>
+          <td class="text-muted small">${new Date(registro.created_at).toLocaleDateString('es-ES')}</td>
+          <td class="text-nowrap">
+            ${registro.estado_pago === 'pendiente'
+              ? `<button class="btn btn-success btn-sm me-1" title="Confirmar pago de reserva"
+                   onclick="PageHistorial.confirmarReserva(${registro.id})">
+                   <i class="bi bi-cash-coin"></i>
+                 </button>`
+              : ''}
+            <a href="${buildWaLink(registro.celular, mensaje)}" target="_blank" rel="noopener noreferrer"
+               class="btn btn-whatsapp btn-sm me-1" title="Enviar aviso por WhatsApp">
+              <i class="bi bi-whatsapp"></i>
+            </a>
+            <button class="btn btn-outline-danger btn-sm" title="Eliminar reserva"
+              onclick="PageHistorial.deleteReserva(${registro.id})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>`;
+    }
+
+    return `
+      <tr>
+        <td><code class="fw-bold text-primary">${escHtml(registro.codigo)}</code>
+          ${registro.ganador ? '<span class="badge bg-warning text-dark ms-1"><i class="bi bi-trophy-fill"></i> Ganador</span>' : ''}
+        </td>
+        <td><span class="d-inline-block text-truncate" style="max-width:130px" title="${escHtml(registro.sorteo_nombre)}">${escHtml(registro.sorteo_nombre)}</span></td>
+        <td>${escHtml(registro.nombre_persona || '—')}
+          ${registro.acompanante ? `<span class="badge bg-light text-dark border ms-1" title="Asiste con acompañante: ${escHtml(registro.acompanante_nombre || 'sin nombre')}"><i class="bi bi-people-fill"></i></span>` : ''}
+        </td>
+        <td>${escHtml(registro.cedula)}</td>
+        <td>${escHtml(registro.celular)}</td>
+        <td>${PageHistorial.origenBadge(registro.origen)}</td>
+        <td>${registro.estado_pago === 'pendiente'
+          ? '<span class="badge bg-warning text-dark">Pendiente</span>'
+          : '<span class="badge bg-success">Confirmado</span>'}</td>
+        <td class="text-muted small">${new Date(registro.created_at).toLocaleDateString('es-ES')}</td>
+        <td class="text-nowrap">
+          ${registro.estado_pago === 'pendiente'
+            ? `<button class="btn btn-success btn-sm me-1" title="Confirmar pago"
+                 onclick="PageHistorial.setPago(${registro.id}, 'confirmado')">
+                 <i class="bi bi-cash-coin"></i>
+               </button>`
+            : ''}
+          <a href="${buildWaLink(registro.celular, buildCuponWaText(registro))}" target="_blank" rel="noopener noreferrer"
+             class="btn btn-whatsapp btn-sm me-1" title="Enviar por WhatsApp">
+            <i class="bi bi-whatsapp"></i>
+          </a>
+          <button class="btn btn-outline-danger btn-sm" title="Eliminar cupón"
+            onclick="PageHistorial.deleteCupon(${registro.id}, '${escHtml(registro.codigo).replace(/'/g, "\\'")}')">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>`;
+  },
+
+  recordatorioReserva(reserva) {
+    return `Hola ${reserva.nombre || ''}, te recordamos enviar el comprobante de pago de tu reserva para ${reserva.sorteo_nombre}. ` +
+      `Monto pendiente: ₡${Number(reserva.monto_total).toLocaleString('es-ES')} por ${reserva.espacios_reservados} espacio(s).`;
+  },
+
+  pagoVerificadoReserva(reserva) {
+    return `Hola ${reserva.nombre || ''}, pago verificado y espacio reservado para ${reserva.sorteo_nombre}. ` +
+      `Quedan confirmados ${reserva.espacios_reservados} espacio(s).`;
+  },
+
   async setPago(id, estado) {
     try {
       await API.patch(`/api/cupones/${id}/pago`, { estado_pago: estado });
       showToast('Estado de pago actualizado', 'success');
+      await PageHistorial.loadCupones();
+    } catch (err) {
+      showToast(err.message, 'danger');
+    }
+  },
+
+  async confirmarReserva(id) {
+    try {
+      await API.patch(`/api/reservas-cupo/${id}/pago`, {});
+      showToast('Pago de reserva confirmado', 'success');
       await PageHistorial.loadCupones();
     } catch (err) {
       showToast(err.message, 'danger');
@@ -174,6 +246,17 @@ const PageHistorial = {
     try {
       await API.delete(`/api/cupones/${id}`);
       showToast('Cupón eliminado', 'success');
+      await PageHistorial.loadCupones();
+    } catch (err) {
+      showToast(err.message, 'danger');
+    }
+  },
+
+  async deleteReserva(id) {
+    if (!confirm('¿Eliminar esta reserva? Los espacios volverán a estar disponibles.')) return;
+    try {
+      await API.delete(`/api/reservas-cupo/${id}`);
+      showToast('Reserva eliminada y espacios liberados', 'success');
       await PageHistorial.loadCupones();
     } catch (err) {
       showToast(err.message, 'danger');
