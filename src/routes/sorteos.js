@@ -167,31 +167,44 @@ router.patch('/:id/toggle', async (req, res) => {
 // DELETE /api/sorteos/:id
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
+  const client = await pool.connect();
   try {
-    const check = await pool.query(
+    await client.query('BEGIN');
+    const sorteo = await client.query(
+      'SELECT id FROM sorteos WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    if (sorteo.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Sorteo no encontrado.' });
+    }
+    const check = await client.query(
       `SELECT
          (SELECT COUNT(*)::int FROM cupones WHERE sorteo_id = $1) AS cupones_total,
          (SELECT COUNT(*)::int FROM reservas_cupo WHERE sorteo_id = $1) AS reservas_total`,
       [id]
     );
     if (check.rows[0].reservas_total > 0) {
+      await client.query('ROLLBACK');
       return res
         .status(400)
         .json({ error: 'No se puede eliminar: la actividad tiene reservas registradas.' });
     }
     if (check.rows[0].cupones_total > 0) {
+      await client.query('ROLLBACK');
       return res
         .status(400)
         .json({ error: 'No se puede eliminar: el sorteo tiene cupones registrados.' });
     }
-    const result = await pool.query('DELETE FROM sorteos WHERE id=$1 RETURNING id', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Sorteo no encontrado.' });
-    }
+    await client.query('DELETE FROM sorteos WHERE id=$1', [id]);
+    await client.query('COMMIT');
     res.json({ message: 'Sorteo eliminado.' });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al eliminar el sorteo.' });
+  } finally {
+    client.release();
   }
 });
 
