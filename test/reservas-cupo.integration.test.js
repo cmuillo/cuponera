@@ -204,6 +204,79 @@ test('normaliza y valida el WhatsApp configurado por actividad', async () => {
   assert.match(invalid.body.error, /WhatsApp inválido/i);
 });
 
+test('usa el WhatsApp del evento y conserva el respaldo global', async () => {
+  const config = await api('/api/config');
+  assert.equal(config.status, 200);
+  const updatedConfig = await api('/api/config', {
+    method: 'PUT',
+    body: JSON.stringify({
+      ...config.body,
+      whatsapp_comprobantes: '89990000',
+    }),
+  });
+  assert.equal(updatedConfig.status, 200);
+
+  const limited = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad limitada con destinatario propio',
+      fecha_sorteo: '2027-01-17',
+      activo: true,
+      modo_inscripcion: true,
+      tipo_inscripcion: 'cupo_limitado',
+      capacidad_total: 2,
+      precio_espacio: 5000,
+      whatsapp_comprobantes: '81112222',
+    }),
+  });
+  assert.equal(limited.status, 201);
+
+  const reservation = await api('/api/inscripciones', {
+    method: 'POST',
+    body: JSON.stringify({
+      sorteo_id: limited.body.id,
+      cedula: '801',
+      nombre: 'Elena',
+      celular: '85550101',
+    }),
+  });
+  assert.equal(reservation.status, 201);
+  assert.equal(reservation.body.whatsapp_comprobantes, '81112222');
+
+  const regular = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad con respaldo global',
+      fecha_sorteo: '2027-01-18',
+      activo: true,
+      modo_inscripcion: true,
+    }),
+  });
+  assert.equal(regular.status, 201);
+
+  const inscription = await api('/api/inscripciones', {
+    method: 'POST',
+    body: JSON.stringify({
+      sorteo_id: regular.body.id,
+      cedula: '802',
+      nombre: 'Fabio',
+      celular: '85550202',
+    }),
+  });
+  assert.equal(inscription.status, 201);
+
+  const purchase = await api('/api/inscripciones/compra', {
+    method: 'POST',
+    body: JSON.stringify({
+      sorteo_id: regular.body.id,
+      cedula: '802',
+      monto: 5000,
+    }),
+  });
+  assert.equal(purchase.status, 201);
+  assert.equal(purchase.body.whatsapp_comprobantes, '89990000');
+});
+
 test('rechaza convertir una actividad limitada con reservas en normal', async () => {
   const created = await api('/api/sorteos', {
     method: 'POST',

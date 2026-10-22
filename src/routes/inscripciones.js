@@ -240,6 +240,7 @@ router.post('/', async (req, res) => {
       await client.query('COMMIT');
       transactionStarted = false;
       const config = await getConfig();
+      const whatsappComprobantes = sorteo.whatsapp_comprobantes || config.whatsapp_comprobantes;
       return res.status(201).json({
         reserva: reservation.rows[0],
         sorteo: {
@@ -253,7 +254,7 @@ router.post('/', async (req, res) => {
           espacios_ocupados: ocupacion.rows[0].espacios_ocupados + reservaCalculada.espacios_reservados,
           espacios_disponibles: espaciosDisponibles - reservaCalculada.espacios_reservados,
         },
-        whatsapp_comprobantes: config.whatsapp_comprobantes,
+        whatsapp_comprobantes: whatsappComprobantes,
       });
     }
 
@@ -341,7 +342,8 @@ router.post('/compra', async (req, res) => {
     if (!config.compras_adicionales_habilitadas) {
       return res.status(403).json({ error: 'Las compras adicionales están deshabilitadas.' });
     }
-    const { paquetes_cupones: paquetes, whatsapp_comprobantes } = config;
+    const { paquetes_cupones: paquetes } = config;
+    const whatsappComprobantes = sorteo.whatsapp_comprobantes || config.whatsapp_comprobantes;
     const paquete = paquetes.find((p) => p.monto === monto);
     if (!paquete) {
       return res.status(400).json({ error: 'El paquete seleccionado no está disponible.' });
@@ -371,7 +373,7 @@ router.post('/compra', async (req, res) => {
         fecha_sorteo: sorteo.fecha_sorteo,
       },
       paquete,
-      whatsapp_comprobantes,
+      whatsapp_comprobantes: whatsappComprobantes,
       cupones: creados,
     });
   } catch (err) {
