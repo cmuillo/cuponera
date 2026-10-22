@@ -57,6 +57,23 @@ async function waitForDeleteLock() {
   throw new Error('La eliminación no quedó esperando el bloqueo de la actividad.');
 }
 
+async function waitForReservationLock() {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const result = await pool.query(`
+      SELECT query
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND state = 'active'
+        AND pid <> pg_backend_pid()
+        AND query LIKE 'SELECT * FROM sorteos WHERE id = $1 FOR UPDATE%'
+      LIMIT 1
+    `);
+    if (result.rows.length > 0) return;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error('La reserva no quedó esperando el bloqueo de la actividad.');
+}
+
 test.before(async () => {
   pool = new Pool({ connectionString: databaseUrl });
   await pool.query('DROP SCHEMA public CASCADE');
@@ -349,4 +366,68 @@ test('rechaza acompañante cuando queda un espacio y oculta cédulas reservadas 
     [created.body.id, '668']
   );
   assert.equal(rejected.rows[0].total, 0);
+});
+
+test('no reduce la capacidad por debajo de una reserva pública simultánea', async () => {
+  const created = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad protegida al actualizar',
+      fecha_sorteo: '2027-01-20',
+      activo: true,
+      modo_inscripcion: true,
+      tipo_inscripcion: 'cupo_limitado',
+      capacidad_total: 2,
+      precio_espacio: 5000,
+    }),
+  });
+  assert.equal(created.status, 201);
+  await pool.query(
+    `INSERT INTO reservas_cupo
+       (sorteo_id, cedula, nombre, celular, espacios_reservados, monto_total)
+     VALUES ($1, '777', 'Julia Inicial', '80000001', 1, 5000)`,
+    [created.body.id]
+  );
+
+  const lockClient = await pool.connect();
+  try {
+    await lockClient.query('BEGIN');
+    await lockClient.query('SELECT id FROM sorteos WHERE id = $1 FOR UPDATE', [created.body.id]);
+
+    const reservationPromise = api('/api/inscripciones', {
+      method: 'POST',
+      body: JSON.stringify({
+        sorteo_id: created.body.id,
+        cedula: '778',
+        nombre: 'Kevin Simultáneo',
+        celular: '80000002',
+        acompanante: false,
+        acompanante_nombre: '',
+      }),
+    });
+    await waitForReservationLock();
+
+    const updatePromise = api(`/api/sorteos/${created.body.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...created.body,
+        capacidad_total: 1,
+      }),
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await lockClient.query('COMMIT');
+
+    const [reservationResponse, updateResponse] = await Promise.all([reservationPromise, updatePromise]);
+    assert.equal(reservationResponse.status, 201);
+    assert.equal(updateResponse.status, 400);
+
+    const activity = await pool.query(
+      'SELECT capacidad_total FROM sorteos WHERE id = $1',
+      [created.body.id]
+    );
+    assert.equal(activity.rows[0].capacidad_total, 2);
+  } finally {
+    await lockClient.query('ROLLBACK').catch(() => {});
+    lockClient.release();
+  }
 });

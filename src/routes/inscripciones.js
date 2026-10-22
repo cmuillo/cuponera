@@ -50,6 +50,14 @@ router.get('/sorteo/:id', async (req, res) => {
   try {
     const { sorteo, error, status } = await loadSorteoInscripcion(sorteoId);
     if (error) return res.status(status).json({ error });
+    let espaciosOcupados = null;
+    if (sorteo.tipo_inscripcion === 'cupo_limitado') {
+      const ocupacion = await pool.query(
+        'SELECT COALESCE(SUM(espacios_reservados), 0)::int AS total FROM reservas_cupo WHERE sorteo_id = $1',
+        [sorteo.id]
+      );
+      espaciosOcupados = ocupacion.rows[0].total;
+    }
     res.json({
       id: sorteo.id,
       nombre: sorteo.nombre,
@@ -59,17 +67,9 @@ router.get('/sorteo/:id', async (req, res) => {
       tipo_inscripcion: sorteo.tipo_inscripcion,
       capacidad_total: sorteo.capacidad_total,
       precio_espacio: sorteo.precio_espacio,
-      espacios_ocupados: sorteo.tipo_inscripcion === 'cupo_limitado'
-        ? (await pool.query(
-          'SELECT COALESCE(SUM(espacios_reservados), 0)::int AS total FROM reservas_cupo WHERE sorteo_id = $1',
-          [sorteo.id]
-        )).rows[0].total
-        : null,
+      espacios_ocupados: espaciosOcupados,
       espacios_disponibles: sorteo.tipo_inscripcion === 'cupo_limitado'
-        ? sorteo.capacidad_total - (await pool.query(
-          'SELECT COALESCE(SUM(espacios_reservados), 0)::int AS total FROM reservas_cupo WHERE sorteo_id = $1',
-          [sorteo.id]
-        )).rows[0].total
+        ? sorteo.capacidad_total - espaciosOcupados
         : null,
     });
   } catch (err) {

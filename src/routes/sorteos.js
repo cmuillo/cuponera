@@ -101,31 +101,39 @@ router.put('/:id', async (req, res) => {
   if (tipoInscripcion.error) {
     return res.status(400).json({ error: tipoInscripcion.error });
   }
+  const client = await pool.connect();
+  let transactionStarted = false;
   try {
-    const existing = await pool.query(
-      'SELECT tipo_inscripcion FROM sorteos WHERE id = $1',
+    await client.query('BEGIN');
+    transactionStarted = true;
+    const existing = await client.query(
+      'SELECT tipo_inscripcion FROM sorteos WHERE id = $1 FOR UPDATE',
       [id]
     );
     if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
       return res.status(404).json({ error: 'Sorteo no encontrado.' });
     }
     if (
       existing.rows[0].tipo_inscripcion === 'cupo_limitado' &&
       tipoInscripcion.tipo_inscripcion === 'cupo_limitado'
     ) {
-      const reservations = await pool.query(
+      const reservations = await client.query(
         `SELECT COALESCE(SUM(espacios_reservados), 0)::int AS espacios_reservados
          FROM reservas_cupo WHERE sorteo_id = $1`,
         [id]
       );
       const espaciosReservados = reservations.rows[0].espacios_reservados;
       if (tipoInscripcion.capacidad_total < espaciosReservados) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
         return res.status(400).json({
           error: `La capacidad no puede ser menor que los ${espaciosReservados} espacios reservados.`,
         });
       }
     }
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE sorteos SET nombre=$1, descripcion=$2, fecha_sorteo=$3, activo=$4, monto_minimo=$5,
          modo_inscripcion=$6, restringir_padron=$7, tipo_inscripcion=$8, capacidad_total=$9,
          precio_espacio=$10, updated_at=NOW()
@@ -137,12 +145,19 @@ router.put('/:id', async (req, res) => {
       ]
     );
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
       return res.status(404).json({ error: 'Sorteo no encontrado.' });
     }
+    await client.query('COMMIT');
+    transactionStarted = false;
     res.json(result.rows[0]);
   } catch (err) {
+    if (transactionStarted) await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ error: 'Error al actualizar el sorteo.' });
+  } finally {
+    client.release();
   }
 });
 
