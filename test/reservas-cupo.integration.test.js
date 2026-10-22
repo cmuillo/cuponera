@@ -204,6 +204,34 @@ test('normaliza y valida el WhatsApp configurado por actividad', async () => {
   assert.match(invalid.body.error, /WhatsApp inválido/i);
 });
 
+test('guarda vacío el WhatsApp con espacios y rechaza signos sin dígitos', async () => {
+  const blank = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad sin WhatsApp propio',
+      fecha_sorteo: '2027-01-17',
+      activo: true,
+      whatsapp_comprobantes: '   ',
+    }),
+  });
+  assert.equal(blank.status, 201);
+  assert.equal(blank.body.whatsapp_comprobantes, null);
+
+  const invalidUpdate = await api(`/api/sorteos/${blank.body.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      ...blank.body,
+      whatsapp_comprobantes: '--------',
+    }),
+  });
+  assert.equal(invalidUpdate.status, 400);
+  assert.match(invalidUpdate.body.error, /WhatsApp inválido/i);
+
+  const listed = await api('/api/sorteos');
+  const saved = listed.body.find((sorteo) => sorteo.id === blank.body.id);
+  assert.equal(saved.whatsapp_comprobantes, null);
+});
+
 test('usa el WhatsApp del evento y conserva el respaldo global', async () => {
   const config = await api('/api/config');
   assert.equal(config.status, 200);

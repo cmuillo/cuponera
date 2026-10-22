@@ -26,7 +26,8 @@ async function generateUniqueCouponCode(sorteoId) {
 function normalizeCelular(celular) {
   if (!celular) return null;
   const clean = String(celular).replace(/\s/g, '');
-  if (!/^[\d+\-]{8,15}$/.test(clean)) return null;
+  const digitCount = clean.replace(/\D/g, '').length;
+  if (!/^[\d+\-]{8,15}$/.test(clean) || digitCount < 8 || digitCount > 15) return null;
   return clean;
 }
 

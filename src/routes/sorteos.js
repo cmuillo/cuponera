@@ -6,6 +6,17 @@ const { normalizeCelular } = require('../utils/cupones');
 
 const router = express.Router();
 
+function parseWhatsappComprobantes(value) {
+  const raw = value === undefined || value === null ? '' : String(value).trim();
+  if (!raw) return { whatsappComprobantes: null };
+
+  const whatsappComprobantes = normalizeCelular(raw);
+  if (!whatsappComprobantes) {
+    return { error: 'Formato de número de WhatsApp inválido.' };
+  }
+  return { whatsappComprobantes };
+}
+
 // Todos los endpoints requieren auth
 router.use(authMiddleware);
 
@@ -65,12 +76,8 @@ router.post('/', async (req, res) => {
   if (tipoInscripcion.error) {
     return res.status(400).json({ error: tipoInscripcion.error });
   }
-  const whatsappComprobantes = req.body.whatsapp_comprobantes
-    ? normalizeCelular(req.body.whatsapp_comprobantes)
-    : null;
-  if (req.body.whatsapp_comprobantes && !whatsappComprobantes) {
-    return res.status(400).json({ error: 'Formato de número de WhatsApp inválido.' });
-  }
+  const whatsapp = parseWhatsappComprobantes(req.body.whatsapp_comprobantes);
+  if (whatsapp.error) return res.status(400).json({ error: whatsapp.error });
   try {
     const result = await pool.query(
       `INSERT INTO sorteos (
@@ -80,7 +87,7 @@ router.post('/', async (req, res) => {
       [
         nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion,
         restringirPadron, tipoInscripcion.tipo_inscripcion, tipoInscripcion.capacidad_total,
-        tipoInscripcion.precio_espacio, whatsappComprobantes,
+        tipoInscripcion.precio_espacio, whatsapp.whatsappComprobantes,
       ]
     );
     res.status(201).json(result.rows[0]);
@@ -108,12 +115,8 @@ router.put('/:id', async (req, res) => {
   if (tipoInscripcion.error) {
     return res.status(400).json({ error: tipoInscripcion.error });
   }
-  const whatsappComprobantes = req.body.whatsapp_comprobantes
-    ? normalizeCelular(req.body.whatsapp_comprobantes)
-    : null;
-  if (req.body.whatsapp_comprobantes && !whatsappComprobantes) {
-    return res.status(400).json({ error: 'Formato de número de WhatsApp inválido.' });
-  }
+  const whatsapp = parseWhatsappComprobantes(req.body.whatsapp_comprobantes);
+  if (whatsapp.error) return res.status(400).json({ error: whatsapp.error });
   const client = await pool.connect();
   let transactionStarted = false;
   try {
@@ -161,7 +164,7 @@ router.put('/:id', async (req, res) => {
       [
         nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion,
         restringirPadron, tipoInscripcion.tipo_inscripcion, tipoInscripcion.capacidad_total,
-        tipoInscripcion.precio_espacio, whatsappComprobantes, id,
+        tipoInscripcion.precio_espacio, whatsapp.whatsappComprobantes, id,
       ]
     );
     if (result.rows.length === 0) {
