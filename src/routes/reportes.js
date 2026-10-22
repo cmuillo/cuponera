@@ -47,6 +47,50 @@ router.get('/estadisticas', async (req, res) => {
   }
 });
 
+// GET /api/reportes/reservas-cupo?sorteoId=&buscar=
+router.get('/reservas-cupo', async (req, res) => {
+  const { sorteoId, buscar } = req.query;
+  let query = `
+    SELECT
+      r.id,
+      r.sorteo_id,
+      r.cedula,
+      r.nombre,
+      r.celular,
+      r.acompanante,
+      r.acompanante_nombre,
+      r.espacios_reservados,
+      r.monto_total,
+      r.estado_pago,
+      r.created_at,
+      s.nombre AS sorteo_nombre,
+      s.fecha_sorteo
+    FROM reservas_cupo r
+    JOIN sorteos s ON s.id = r.sorteo_id
+    WHERE 1 = 1
+  `;
+  const params = [];
+  let index = 1;
+  if (sorteoId) {
+    query += ` AND r.sorteo_id = $${index++}`;
+    params.push(sorteoId);
+  }
+  if (buscar) {
+    query += ` AND (r.cedula ILIKE $${index} OR r.celular ILIKE $${index})`;
+    params.push(`%${buscar}%`);
+    index++;
+  }
+  query += ' ORDER BY r.created_at DESC, r.id DESC';
+
+  try {
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener reservas de cupo.' });
+  }
+});
+
 // GET /api/reportes/pdf/:sorteoId
 router.get('/pdf/:sorteoId', async (req, res) => {
   const { sorteoId } = req.params;

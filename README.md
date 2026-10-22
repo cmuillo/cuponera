@@ -5,11 +5,11 @@ Sistema web móvil y responsivo para gestión de sorteos, generación de cupones
 ## ✨ Funcionalidades
 
 - **Sorteos y Actividades** — Crear, editar, activar/desactivar sorteos con fecha y descripción
-- **Inscripción pública (invitados)** — Ventana sin login donde la persona se inscribe sola y obtiene su cupón, con casilla de acompañante y compra de cupones adicionales
+- **Inscripción pública (invitados)** — Ventana sin login para obtener cupones o reservar espacios limitados, con acompañante y compra de cupones adicionales cuando corresponde
 - **Padrón por Excel** — Restringir una actividad a un listado previo de cédulas cargado desde `.xlsx`/`.csv`
 - **Generación de Cupones** — Código único por participante (cédula + celular), con botón de WhatsApp
 - **Historial de Cupones** — Búsqueda, reenvío por WhatsApp y confirmación de pagos pendientes
-- **Reportes** — Estadísticas por cédula/celular, exportación a Excel con acompañantes + PDF cuadrícula para imprimir/tómbola física
+- **Reportes** — Estadísticas de cupones y reservas de cupo separadas, exportación a Excel + PDF de cupones para imprimir/tómbola física
 - **Tómbola Digital** — Ruleta animada HTML5 Canvas, modo único y extracción múltiple
 - **Configuración del Sistema** — Número de WhatsApp para comprobantes y paquetes de cupones
 - **Mi Cuenta** — Cambio de contraseña del administrador
@@ -53,14 +53,34 @@ Al crear o editar un sorteo con inscripción pública se elige entre:
   pública aparece un buscador por nombre; solo muestra personas autorizadas que aún no se han
   inscrito y, al seleccionar una, completa su nombre y cédula.
 
+### Actividades con cupo limitado
+
+Una actividad pública puede configurarse como **cupo limitado**, indicando su capacidad total y
+el precio por espacio. La inscripción pública registra una **reserva de cupo**, no una inscripción
+ni un cupón: el titular reserva un espacio y, al incluir acompañante, reserva dos y paga el doble
+del precio configurado. El importe queda congelado en la reserva aunque posteriormente cambie el
+precio de la actividad.
+
+Las reservas comienzan con pago **pendiente** y un administrador debe confirmarlo desde el
+historial de reservas; después quedan como **confirmado**. La administración no puede reducir la
+capacidad por debajo de los espacios reservados ni eliminar una actividad con reservas, aunque sí
+puede desactivarla. Las reservas no generan códigos, no aparecen en el PDF de cupones, y nunca
+participan en ganadores ni en la tómbola.
+
 ## 📊 Exportación de reportes
 
-En *Reportes* el botón **Exportar Excel** genera un `.xlsx` con dos hojas:
+En *Reportes* los totales de cupones y reservas se muestran por separado. El botón **Exportar
+Excel** genera un `.xlsx` con tres hojas:
 
 - **Participantes** — Nombre, cédula, teléfono, **acompañante**, **nombre del acompañante**,
   cantidad de cupones, códigos y sorteo.
 - **Resumen** — Totales de cupones, participantes, acompañantes y **personas a asistir**
   (participantes + acompañantes).
+- **Reservas de cupo** — Titular, acompañante, espacios reservados, monto total y estado de
+  pago, sin códigos de cupón.
+
+El PDF se mantiene exclusivamente para cupones: las reservas de cupo no se agregan al PDF ni a
+la tómbola.
 
 ## 🚀 Despliegue en Railway
 

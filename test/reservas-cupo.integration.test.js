@@ -485,3 +485,43 @@ test('administra reservas sin convertirlas en cupones y libera sus espacios al e
   assert.equal(reservations.rows[0].total, 1);
   assert.equal(coupons.rows[0].total, 0);
 });
+
+test('reporta reservas pendientes y confirmadas sin códigos de cupón', async () => {
+  const created = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad para reporte de reservas',
+      fecha_sorteo: '2027-01-21',
+      activo: true,
+      modo_inscripcion: true,
+      tipo_inscripcion: 'cupo_limitado',
+      capacidad_total: 4,
+      precio_espacio: 5000,
+    }),
+  });
+  assert.equal(created.status, 201);
+
+  await pool.query(
+    `INSERT INTO reservas_cupo
+       (sorteo_id, cedula, nombre, celular, acompanante, acompanante_nombre, espacios_reservados, monto_total, estado_pago)
+     VALUES ($1, '900', 'Paula Pendiente', '80009000', false, NULL, 1, 5000, 'pendiente'),
+            ($1, '901', 'Carlos Confirmado', '80009001', true, 'Andrea', 2, 10000, 'confirmado')`,
+    [created.body.id]
+  );
+
+  const report = await api(`/api/reportes/reservas-cupo?sorteoId=${created.body.id}&buscar=800090`);
+  assert.equal(report.status, 200);
+  assert.equal(report.body.length, 2);
+  assert.deepEqual(
+    report.body
+      .map(({ cedula, espacios_reservados, monto_total, estado_pago }) => ({
+        cedula, espacios_reservados, monto_total, estado_pago,
+      }))
+      .sort((a, b) => a.cedula.localeCompare(b.cedula)),
+    [
+      { cedula: '900', espacios_reservados: 1, monto_total: 5000, estado_pago: 'pendiente' },
+      { cedula: '901', espacios_reservados: 2, monto_total: 10000, estado_pago: 'confirmado' },
+    ]
+  );
+  assert.ok(report.body.every(reserva => !Object.hasOwn(reserva, 'codigo')));
+});

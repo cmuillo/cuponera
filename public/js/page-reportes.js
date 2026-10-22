@@ -3,6 +3,7 @@
  */
 const PageReportes = {
   data: [],
+  reservas: [],
 
   async render(container) {
     let sorteos = [];
@@ -45,36 +46,48 @@ const PageReportes = {
           </div>
           <div class="form-text mt-1">
             <i class="bi bi-info-circle me-1"></i>
-            <strong>Exportar Excel</strong> incluye la casilla de acompañante y el conteo de personas a asistir.
-            <strong>PDF Cupones</strong> genera la hoja de cupones para imprimir y tómbola física (requiere seleccionar un sorteo).
+            <strong>Exportar Excel</strong> incluye cupones y reservas de cupo en hojas separadas.
+            <strong>PDF Cupones</strong> genera únicamente cupones para imprimir y tómbola física (requiere seleccionar un sorteo).
           </div>
         </div>
       </div>
 
       <!-- Stats Cards -->
       <div class="row g-3 mb-4" id="statsCards">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
           <div class="stat-card">
             <div class="stat-num" id="statTotalCupones">—</div>
             <div class="stat-label">Total cupones</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
           <div class="stat-card">
             <div class="stat-num" id="statPersonas">—</div>
             <div class="stat-label">Participantes únicos</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
           <div class="stat-card">
             <div class="stat-num" id="statAcompanantes">—</div>
             <div class="stat-label">Con acompañante</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
           <div class="stat-card">
             <div class="stat-num" id="statAsistentes">—</div>
             <div class="stat-label">Personas a asistir</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div class="stat-num" id="statReservas">—</div>
+            <div class="stat-label">Reservas de cupo</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="stat-card">
+            <div class="stat-num" id="statEspaciosReservados">—</div>
+            <div class="stat-label">Espacios reservados</div>
           </div>
         </div>
       </div>
@@ -109,15 +122,23 @@ const PageReportes = {
     if (buscar) params.set('buscar', buscar);
 
     try {
-      const data = await API.get(`/api/reportes/estadisticas?${params.toString()}`);
+      const queryString = params.toString();
+      const [data, reservas] = await Promise.all([
+        API.get(`/api/reportes/estadisticas?${queryString}`),
+        API.get(`/api/reportes/reservas-cupo?${queryString}`),
+      ]);
       PageReportes.data = data;
+      PageReportes.reservas = reservas;
 
       // Calcular stats globales
       const totales = PageReportes.calcTotales(data);
+      const totalesReservas = PageReportes.calcTotalesReservas(reservas);
       document.getElementById('statTotalCupones').textContent = totales.totalCupones;
       document.getElementById('statPersonas').textContent = totales.personas;
       document.getElementById('statAcompanantes').textContent = totales.acompanantes;
       document.getElementById('statAsistentes').textContent = totales.asistentes;
+      document.getElementById('statReservas').textContent = totalesReservas.reservas;
+      document.getElementById('statEspaciosReservados').textContent = totalesReservas.espacios;
 
       if (data.length === 0) {
         el.innerHTML = '<div class="empty-state"><i class="bi bi-graph-up"></i>No hay datos para mostrar.</div>';
@@ -201,6 +222,15 @@ const PageReportes = {
     };
   },
 
+  calcTotalesReservas(reservas) {
+    return {
+      reservas: reservas.length,
+      espacios: reservas.reduce((total, reserva) => total + parseInt(reserva.espacios_reservados || 0), 0),
+      monto: reservas.reduce((total, reserva) => total + parseInt(reserva.monto_total || 0), 0),
+      pendientes: reservas.filter(reserva => reserva.estado_pago === 'pendiente').length,
+    };
+  },
+
   buildResumenWa(row) {
     const codigos = (row.codigos || []).join('\n• ');
     return `📊 *Resumen de cupones — ${row.sorteo_nombre}*\n\n` +
@@ -211,14 +241,15 @@ const PageReportes = {
       `📅 Fecha del sorteo: ${formatDate(row.fecha_sorteo)}\n\n¡Mucha suerte! 🍀`;
   },
 
-  /** Exporta el detalle a Excel, incluyendo acompañante y conteo de asistentes. */
+  /** Exporta los detalles de cupones y reservas de cupo en hojas separadas. */
   exportarExcel() {
     if (typeof XLSX === 'undefined') {
       showToast('No se pudo cargar el generador de Excel. Verifique su conexión.', 'danger');
       return;
     }
     const data = PageReportes.data || [];
-    if (data.length === 0) {
+    const reservas = PageReportes.reservas || [];
+    if (data.length === 0 && reservas.length === 0) {
       showToast('No hay datos para exportar', 'warning');
       return;
     }
@@ -239,17 +270,34 @@ const PageReportes = {
     }));
 
     const t = PageReportes.calcTotales(data);
+    const tReservas = PageReportes.calcTotalesReservas(reservas);
     const resumen = [
       { Indicador: 'Participantes únicos', Valor: t.personas },
       { Indicador: 'Con acompañante', Valor: t.acompanantes },
       { Indicador: 'Total de personas a asistir', Valor: t.asistentes },
       { Indicador: 'Total de cupones', Valor: t.totalCupones },
       { Indicador: 'Cupones pendientes de pago', Valor: t.pendientes },
+      { Indicador: 'Total de reservas de cupo', Valor: tReservas.reservas },
+      { Indicador: 'Espacios reservados', Valor: tReservas.espacios },
+      { Indicador: 'Monto total de reservas', Valor: tReservas.monto },
+      { Indicador: 'Reservas pendientes de pago', Valor: tReservas.pendientes },
     ];
+    const filasReservas = reservas.map(reserva => ({
+      'Titular': reserva.nombre || '',
+      'Cédula': reserva.cedula,
+      'Teléfono': reserva.celular,
+      'Acompañante': reserva.acompanante ? (reserva.acompanante_nombre || 'Sí') : 'No',
+      'Espacios reservados': parseInt(reserva.espacios_reservados),
+      'Monto total': parseInt(reserva.monto_total),
+      'Estado de pago': reserva.estado_pago,
+      'Sorteo': reserva.sorteo_nombre,
+      'Fecha del sorteo': formatDate(reserva.fecha_sorteo),
+    }));
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Participantes');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), 'Resumen');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filasReservas), 'Reservas de cupo');
 
     const sel = document.getElementById('rptSorteo');
     const nombre = (sel.value ? sel.options[sel.selectedIndex].text : 'todos-los-sorteos')
