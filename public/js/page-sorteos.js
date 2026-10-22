@@ -49,6 +49,30 @@ const PageSorteos = {
                   <label class="form-check-label" for="sorteoModoInscripcion">Inscripción pública de invitados</label>
                   <div class="form-text">Habilita una ventana pública donde la persona se inscribe sola y obtiene su cupón.</div>
                 </div>
+                <div class="mb-3">
+                  <label class="form-label fw-semibold" for="sorteoTipoInscripcion">Tipo de inscripción</label>
+                  <select id="sorteoTipoInscripcion" class="form-select"
+                          onchange="PageSorteos.onTipoInscripcionChange()">
+                    <option value="normal">Normal</option>
+                    <option value="cupo_limitado">Cupo limitado</option>
+                  </select>
+                </div>
+                <div class="mb-3 d-none" id="sorteoCupoLimitadoGroup">
+                  <div class="row g-2">
+                    <div class="col-sm-6">
+                      <label class="form-label fw-semibold" for="sorteoCapacidadTotal">Espacios totales</label>
+                      <input type="number" id="sorteoCapacidadTotal" class="form-control" min="1" step="1" />
+                    </div>
+                    <div class="col-sm-6">
+                      <label class="form-label fw-semibold" for="sorteoPrecioEspacio">Precio por espacio</label>
+                      <div class="input-group">
+                        <span class="input-group-text">₡</span>
+                        <input type="number" id="sorteoPrecioEspacio" class="form-control" min="1" step="1" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-text">El precio se aplica únicamente a nuevas reservas.</div>
+                </div>
                 <div class="mb-4 ps-3 border-start d-none" id="sorteoPadronGroup">
                   <label class="form-label fw-semibold small">¿Quién puede inscribirse?</label>
                   <div class="form-check">
@@ -160,6 +184,7 @@ const PageSorteos = {
               <span class="${s.activo ? 'badge-activo' : 'badge-inactivo'}">${s.activo ? 'Activo' : 'Inactivo'}</span>              ${s.monto_minimo > 0 ? `<span class="badge bg-light text-dark border"><i class="bi bi-coin me-1"></i>₡${parseInt(s.monto_minimo).toLocaleString()} mínimo</span>` : ''}
               ${s.modo_inscripcion ? '<span class="badge bg-info text-dark"><i class="bi bi-person-plus me-1"></i>Inscripción pública</span>' : ''}
               ${s.modo_inscripcion && s.restringir_padron ? `<span class="badge bg-warning text-dark"><i class="bi bi-shield-check me-1"></i>Listado previo (${s.padron_total || 0})</span>` : ''}
+              ${s.tipo_inscripcion === 'cupo_limitado' ? `<span class="badge bg-primary"><i class="bi bi-people me-1"></i>Cupo ${s.espacios_ocupados || 0}/${s.capacidad_total} (${s.espacios_disponibles} disponibles)</span>` : ''}
             </div>
             <div class="text-muted small mt-1">
               <i class="bi bi-calendar3 me-1"></i>${formatDate(s.fecha_sorteo)}
@@ -214,6 +239,9 @@ const PageSorteos = {
       monto_minimo: parseInt(document.getElementById('sorteoMontoMin').value) || 0,
       modo_inscripcion: modoInscripcion,
       restringir_padron: modoInscripcion && document.getElementById('sorteoAccesoPadron').checked,
+      tipo_inscripcion: document.getElementById('sorteoTipoInscripcion').value,
+      capacidad_total: parseInt(document.getElementById('sorteoCapacidadTotal').value, 10),
+      precio_espacio: parseInt(document.getElementById('sorteoPrecioEspacio').value, 10),
     };
     try {
       if (id) {
@@ -244,9 +272,13 @@ const PageSorteos = {
       document.getElementById('sorteoActivo').checked = s.activo;
       document.getElementById('sorteoMontoMin').value = s.monto_minimo || 0;
       document.getElementById('sorteoModoInscripcion').checked = !!s.modo_inscripcion;
+      document.getElementById('sorteoTipoInscripcion').value = s.tipo_inscripcion || 'normal';
+      document.getElementById('sorteoCapacidadTotal').value = s.capacidad_total || '';
+      document.getElementById('sorteoPrecioEspacio').value = s.precio_espacio || '';
       document.getElementById('sorteoAccesoPadron').checked = !!s.restringir_padron;
       document.getElementById('sorteoAccesoLibre').checked = !s.restringir_padron;
       PageSorteos.onModoInscripcionChange();
+      PageSorteos.onTipoInscripcionChange();
       document.getElementById('sorteoFormTitle').textContent = 'Editar Sorteo';
       document.getElementById('sorteoSubmitBtn').innerHTML = '<i class="bi bi-check2 me-1"></i>Guardar Cambios';
       document.getElementById('sorteoCancelBtn').classList.remove('d-none');
@@ -259,7 +291,9 @@ const PageSorteos = {
     document.getElementById('sorteoForm').reset();
     document.getElementById('sorteoActivo').checked = true;
     document.getElementById('sorteoAccesoLibre').checked = true;
+    document.getElementById('sorteoTipoInscripcion').value = 'normal';
     PageSorteos.onModoInscripcionChange();
+    PageSorteos.onTipoInscripcionChange();
     document.getElementById('sorteoFormTitle').textContent = 'Nuevo Sorteo';
     document.getElementById('sorteoSubmitBtn').innerHTML = '<i class="bi bi-plus-circle me-1"></i>Crear Sorteo';
     document.getElementById('sorteoCancelBtn').classList.add('d-none');
@@ -269,6 +303,13 @@ const PageSorteos = {
   onModoInscripcionChange() {
     const activo = document.getElementById('sorteoModoInscripcion').checked;
     document.getElementById('sorteoPadronGroup').classList.toggle('d-none', !activo);
+  },
+
+  onTipoInscripcionChange() {
+    const limitado = document.getElementById('sorteoTipoInscripcion').value === 'cupo_limitado';
+    document.getElementById('sorteoCupoLimitadoGroup').classList.toggle('d-none', !limitado);
+    document.getElementById('sorteoCapacidadTotal').required = limitado;
+    document.getElementById('sorteoPrecioEspacio').required = limitado;
   },
 
   linkInscripcion(id) {

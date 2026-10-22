@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../db');
 const authMiddleware = require('../middleware/auth');
+const { parseTipoInscripcion } = require('../utils/reservas-cupo');
 
 const router = express.Router();
 
@@ -13,7 +14,19 @@ router.get('/', async (req, res) => {
   let query = `
     SELECT s.*,
       (SELECT COUNT(*)::int FROM sorteo_padron p WHERE p.sorteo_id = s.id) AS padron_total,
-      (SELECT COUNT(*)::int FROM inscripciones i WHERE i.sorteo_id = s.id) AS inscritos_total
+      (SELECT COUNT(*)::int FROM inscripciones i WHERE i.sorteo_id = s.id) AS inscritos_total,
+      (SELECT COUNT(*)::int FROM reservas_cupo r WHERE r.sorteo_id = s.id) AS reservas_total,
+      COALESCE(
+        (SELECT SUM(r.espacios_reservados)::int FROM reservas_cupo r WHERE r.sorteo_id = s.id),
+        0
+      ) AS espacios_ocupados,
+      CASE WHEN s.tipo_inscripcion = 'cupo_limitado'
+        THEN s.capacidad_total - COALESCE(
+          (SELECT SUM(r.espacios_reservados)::int FROM reservas_cupo r WHERE r.sorteo_id = s.id),
+          0
+        )
+        ELSE NULL
+      END AS espacios_disponibles
     FROM sorteos s
   `;
   const params = [];
@@ -44,11 +57,24 @@ router.post('/', async (req, res) => {
   if (montoMin < 0) return res.status(400).json({ error: 'El monto mínimo no puede ser negativo.' });
   const modoInscripcion = modo_inscripcion === true;
   const restringirPadron = modoInscripcion && restringir_padron === true;
+  const tipoInscripcion = parseTipoInscripcion({
+    ...req.body,
+    tipo_inscripcion: req.body.tipo_inscripcion || 'normal',
+  });
+  if (tipoInscripcion.error) {
+    return res.status(400).json({ error: tipoInscripcion.error });
+  }
   try {
     const result = await pool.query(
-      `INSERT INTO sorteos (nombre, descripcion, fecha_sorteo, activo, monto_minimo, modo_inscripcion, restringir_padron)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion, restringirPadron]
+      `INSERT INTO sorteos (
+         nombre, descripcion, fecha_sorteo, activo, monto_minimo, modo_inscripcion, restringir_padron,
+         tipo_inscripcion, capacidad_total, precio_espacio
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [
+        nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion,
+        restringirPadron, tipoInscripcion.tipo_inscripcion, tipoInscripcion.capacidad_total,
+        tipoInscripcion.precio_espacio,
+      ]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -68,12 +94,47 @@ router.put('/:id', async (req, res) => {
   if (montoMin < 0) return res.status(400).json({ error: 'El monto mínimo no puede ser negativo.' });
   const modoInscripcion = modo_inscripcion === true;
   const restringirPadron = modoInscripcion && restringir_padron === true;
+  const tipoInscripcion = parseTipoInscripcion({
+    ...req.body,
+    tipo_inscripcion: req.body.tipo_inscripcion || 'normal',
+  });
+  if (tipoInscripcion.error) {
+    return res.status(400).json({ error: tipoInscripcion.error });
+  }
   try {
+    const existing = await pool.query(
+      'SELECT tipo_inscripcion FROM sorteos WHERE id = $1',
+      [id]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Sorteo no encontrado.' });
+    }
+    if (
+      existing.rows[0].tipo_inscripcion === 'cupo_limitado' &&
+      tipoInscripcion.tipo_inscripcion === 'cupo_limitado'
+    ) {
+      const reservations = await pool.query(
+        `SELECT COALESCE(SUM(espacios_reservados), 0)::int AS espacios_reservados
+         FROM reservas_cupo WHERE sorteo_id = $1`,
+        [id]
+      );
+      const espaciosReservados = reservations.rows[0].espacios_reservados;
+      if (tipoInscripcion.capacidad_total < espaciosReservados) {
+        return res.status(400).json({
+          error: `La capacidad no puede ser menor que los ${espaciosReservados} espacios reservados.`,
+        });
+      }
+    }
     const result = await pool.query(
       `UPDATE sorteos SET nombre=$1, descripcion=$2, fecha_sorteo=$3, activo=$4, monto_minimo=$5,
-         modo_inscripcion=$6, restringir_padron=$7, updated_at=NOW()
-       WHERE id=$8 RETURNING *`,
-      [nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion, restringirPadron, id]
+         modo_inscripcion=$6, restringir_padron=$7, tipo_inscripcion=$8, capacidad_total=$9,
+         precio_espacio=$10, updated_at=NOW()
+       WHERE id=$11 RETURNING *`,
+      [
+        nombre.trim(), descripcion || null, fecha_sorteo, activo !== false, montoMin, modoInscripcion,
+        restringirPadron, tipoInscripcion.tipo_inscripcion, tipoInscripcion.capacidad_total,
+        tipoInscripcion.precio_espacio, id,
+      ]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Sorteo no encontrado.' });
@@ -107,8 +168,18 @@ router.patch('/:id/toggle', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const check = await pool.query('SELECT COUNT(*) FROM cupones WHERE sorteo_id = $1', [id]);
-    if (parseInt(check.rows[0].count) > 0) {
+    const check = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM cupones WHERE sorteo_id = $1) AS cupones_total,
+         (SELECT COUNT(*)::int FROM reservas_cupo WHERE sorteo_id = $1) AS reservas_total`,
+      [id]
+    );
+    if (check.rows[0].reservas_total > 0) {
+      return res
+        .status(400)
+        .json({ error: 'No se puede eliminar: la actividad tiene reservas registradas.' });
+    }
+    if (check.rows[0].cupones_total > 0) {
       return res
         .status(400)
         .json({ error: 'No se puede eliminar: el sorteo tiene cupones registrados.' });
