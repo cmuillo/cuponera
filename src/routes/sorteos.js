@@ -115,17 +115,24 @@ router.put('/:id', async (req, res) => {
       transactionStarted = false;
       return res.status(404).json({ error: 'Sorteo no encontrado.' });
     }
-    if (
-      existing.rows[0].tipo_inscripcion === 'cupo_limitado' &&
-      tipoInscripcion.tipo_inscripcion === 'cupo_limitado'
-    ) {
+    if (existing.rows[0].tipo_inscripcion === 'cupo_limitado') {
       const reservations = await client.query(
         `SELECT COALESCE(SUM(espacios_reservados), 0)::int AS espacios_reservados
          FROM reservas_cupo WHERE sorteo_id = $1`,
         [id]
       );
       const espaciosReservados = reservations.rows[0].espacios_reservados;
-      if (tipoInscripcion.capacidad_total < espaciosReservados) {
+      if (tipoInscripcion.tipo_inscripcion !== 'cupo_limitado' && espaciosReservados > 0) {
+        await client.query('ROLLBACK');
+        transactionStarted = false;
+        return res.status(400).json({
+          error: 'No se puede cambiar a inscripción normal mientras existan reservas de cupo.',
+        });
+      }
+      if (
+        tipoInscripcion.tipo_inscripcion === 'cupo_limitado' &&
+        tipoInscripcion.capacidad_total < espaciosReservados
+      ) {
         await client.query('ROLLBACK');
         transactionStarted = false;
         return res.status(400).json({

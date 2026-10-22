@@ -168,6 +168,49 @@ test('impide reducir el cupo por debajo de los espacios reservados y conserva lo
   assert.equal(savedReservation.rows[0].monto_total, 5000);
 });
 
+test('rechaza convertir una actividad limitada con reservas en normal', async () => {
+  const created = await api('/api/sorteos', {
+    method: 'POST',
+    body: JSON.stringify({
+      nombre: 'Actividad limitada con reserva protegida',
+      fecha_sorteo: '2027-01-16',
+      activo: true,
+      tipo_inscripcion: 'cupo_limitado',
+      capacidad_total: 2,
+      precio_espacio: 5000,
+    }),
+  });
+  assert.equal(created.status, 201);
+
+  await pool.query(
+    `INSERT INTO reservas_cupo
+       (sorteo_id, cedula, nombre, celular, espacios_reservados, monto_total)
+     VALUES ($1, '112', 'Berta', '86666666', 1, 5000)`,
+    [created.body.id]
+  );
+
+  const transition = await api(`/api/sorteos/${created.body.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      ...created.body,
+      tipo_inscripcion: 'normal',
+    }),
+  });
+
+  assert.equal(transition.status, 400);
+  assert.match(transition.body.error, /reservas/i);
+
+  const activity = await pool.query(
+    'SELECT tipo_inscripcion, capacidad_total, precio_espacio FROM sorteos WHERE id = $1',
+    [created.body.id]
+  );
+  assert.deepEqual(activity.rows[0], {
+    tipo_inscripcion: 'cupo_limitado',
+    capacidad_total: 2,
+    precio_espacio: 5000,
+  });
+});
+
 test('expone ocupación, no elimina actividades reservadas y permite desactivarlas', async () => {
   const listResponse = await api('/api/sorteos');
   assert.equal(listResponse.status, 200);
