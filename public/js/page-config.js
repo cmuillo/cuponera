@@ -34,10 +34,10 @@ const PageConfig = {
 
         <div class="col-lg-6">
           <div class="card">
-            <div class="card-header">WhatsApp para comprobantes</div>
+            <div class="card-header">WhatsApp de respaldo para comprobantes</div>
             <div class="card-body p-4">
               <div id="configAlert" class="d-none"></div>
-              <label class="form-label fw-semibold">Número que recibe los comprobantes de pago</label>
+              <label class="form-label fw-semibold">Número de respaldo que recibe los comprobantes de pago</label>
               <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-whatsapp text-success"></i></span>
                 <input type="tel" id="cfgWhatsapp" class="form-control" maxlength="20"
@@ -45,7 +45,7 @@ const PageConfig = {
               </div>
               <div class="form-text">
                 Para Costa Rica basta con los 8 dígitos; el código de país (+506) se agrega automáticamente.
-                Este es el número al que la persona envía su comprobante desde la ventana de inscripción.
+                Se usa únicamente cuando la actividad no tiene un WhatsApp propio configurado.
               </div>
             </div>
           </div>

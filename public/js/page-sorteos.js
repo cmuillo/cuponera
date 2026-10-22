@@ -50,6 +50,15 @@ const PageSorteos = {
                   <div class="form-text">Habilita una ventana pública donde la persona se inscribe sola y obtiene su cupón.</div>
                 </div>
                 <div class="mb-3">
+                  <label class="form-label fw-semibold" for="sorteoWhatsapp">WhatsApp para comprobantes</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-whatsapp text-success"></i></span>
+                    <input type="tel" id="sorteoWhatsapp" class="form-control" maxlength="20"
+                           placeholder="Ej: 88001234" />
+                  </div>
+                  <div class="form-text">Si lo deja vacío, se usará el WhatsApp de respaldo configurado en el sistema.</div>
+                </div>
+                <div class="mb-3">
                   <label class="form-label fw-semibold" for="sorteoTipoInscripcion">Tipo de inscripción</label>
                   <select id="sorteoTipoInscripcion" class="form-select"
                           onchange="PageSorteos.onTipoInscripcionChange()">
@@ -242,6 +251,7 @@ const PageSorteos = {
       tipo_inscripcion: document.getElementById('sorteoTipoInscripcion').value,
       capacidad_total: parseInt(document.getElementById('sorteoCapacidadTotal').value, 10),
       precio_espacio: parseInt(document.getElementById('sorteoPrecioEspacio').value, 10),
+      whatsapp_comprobantes: document.getElementById('sorteoWhatsapp').value.trim(),
     };
     try {
       if (id) {
@@ -272,6 +282,7 @@ const PageSorteos = {
       document.getElementById('sorteoActivo').checked = s.activo;
       document.getElementById('sorteoMontoMin').value = s.monto_minimo || 0;
       document.getElementById('sorteoModoInscripcion').checked = !!s.modo_inscripcion;
+      document.getElementById('sorteoWhatsapp').value = s.whatsapp_comprobantes || '';
       document.getElementById('sorteoTipoInscripcion').value = s.tipo_inscripcion || 'normal';
       document.getElementById('sorteoCapacidadTotal').value = s.capacidad_total || '';
       document.getElementById('sorteoPrecioEspacio').value = s.precio_espacio || '';
