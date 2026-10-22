@@ -130,15 +130,78 @@ async function initDB() {
         cedula VARCHAR(25) NOT NULL,
         nombre VARCHAR(255),
         celular VARCHAR(25) NOT NULL,
-        acompanante BOOLEAN DEFAULT FALSE,
+        acompanante BOOLEAN NOT NULL DEFAULT FALSE,
         acompanante_nombre VARCHAR(255),
         espacios_reservados INTEGER NOT NULL,
         monto_total INTEGER NOT NULL,
         estado_pago VARCHAR(20) NOT NULL DEFAULT 'pendiente'
           CHECK (estado_pago IN ('pendiente', 'confirmado')),
         created_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT reservas_cupo_espacios_validos
+          CHECK (espacios_reservados IN (1, 2)),
+        CONSTRAINT reservas_cupo_monto_positivo
+          CHECK (monto_total > 0),
+        CONSTRAINT reservas_cupo_acompanante_consistente CHECK (
+          (acompanante IS TRUE AND espacios_reservados = 2)
+          OR (acompanante IS FALSE AND espacios_reservados = 1)
+        ),
         UNIQUE (sorteo_id, cedula)
       )
+    `);
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'sorteos_tipo_inscripcion_valido'
+            AND conrelid = 'sorteos'::regclass
+        ) THEN
+          ALTER TABLE sorteos ADD CONSTRAINT sorteos_tipo_inscripcion_valido CHECK (
+            (tipo_inscripcion = 'normal'
+              AND capacidad_total IS NULL
+              AND precio_espacio IS NULL)
+            OR
+            (tipo_inscripcion = 'cupo_limitado'
+              AND capacidad_total IS NOT NULL
+              AND capacidad_total > 0
+              AND precio_espacio IS NOT NULL
+              AND precio_espacio > 0)
+          );
+        END IF;
+      END
+      $$
+    `);
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'reservas_cupo_espacios_validos'
+            AND conrelid = 'reservas_cupo'::regclass
+        ) THEN
+          ALTER TABLE reservas_cupo ADD CONSTRAINT reservas_cupo_espacios_validos
+            CHECK (espacios_reservados IN (1, 2));
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'reservas_cupo_monto_positivo'
+            AND conrelid = 'reservas_cupo'::regclass
+        ) THEN
+          ALTER TABLE reservas_cupo ADD CONSTRAINT reservas_cupo_monto_positivo
+            CHECK (monto_total > 0);
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'reservas_cupo_acompanante_consistente'
+            AND conrelid = 'reservas_cupo'::regclass
+        ) THEN
+          ALTER TABLE reservas_cupo ADD CONSTRAINT reservas_cupo_acompanante_consistente CHECK (
+            (acompanante IS TRUE AND espacios_reservados = 2)
+            OR (acompanante IS FALSE AND espacios_reservados = 1)
+          );
+        END IF;
+      END
+      $$
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_cupones_sorteo_cedula ON cupones (sorteo_id, cedula)

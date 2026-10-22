@@ -25,6 +25,18 @@ test('normaliza las opciones de inscripción normal sin capacidad ni precio', ()
   });
 });
 
+test('rechaza tipos de inscripción fuera de los modos permitidos', () => {
+  assert.deepEqual(parseTipoInscripcion({
+    tipo_inscripcion: 'otro', capacidad_total: 10, precio_espacio: 5000,
+  }), { error: 'El tipo de inscripción no es válido.' });
+});
+
+test('calcula un espacio y un precio sin acompañante', () => {
+  assert.deepEqual(calcularReserva(false, 5000), {
+    espacios_reservados: 1, monto_total: 5000,
+  });
+});
+
 test('calcula dos espacios y dos precios con acompañante', () => {
   assert.deepEqual(calcularReserva(true, 5000), {
     espacios_reservados: 2, monto_total: 10000,
