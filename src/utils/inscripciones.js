@@ -15,4 +15,9 @@ function parseAcompanante(body) {
   return { acompanante: true, acompanante_nombre: nombre };
 }
 
-module.exports = { parseAcompanante };
+function normalizePadronSearch(value) {
+  const text = String(value || '').trim().replace(/\s+/g, ' ').substring(0, 100);
+  return text.length >= 2 ? text : null;
+}
+
+module.exports = { parseAcompanante, normalizePadronSearch };

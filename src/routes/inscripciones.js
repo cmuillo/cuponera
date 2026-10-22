@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const { pool } = require('../db');
 const { getConfig } = require('../utils/config');
 const { generateUniqueCouponCode, normalizeCelular } = require('../utils/cupones');
-const { parseAcompanante } = require('../utils/inscripciones');
+const { parseAcompanante, normalizePadronSearch } = require('../utils/inscripciones');
 
 const router = express.Router();
 
@@ -56,6 +56,41 @@ router.get('/sorteo/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al cargar la actividad.' });
+  }
+});
+
+// GET /api/inscripciones/padron?sorteo_id=&buscar= — personas autorizadas aún no inscritas
+router.get('/padron', async (req, res) => {
+  const sorteoId = parseInt(req.query.sorteo_id, 10);
+  const buscar = normalizePadronSearch(req.query.buscar);
+  if (!Number.isInteger(sorteoId) || !buscar) {
+    return res.status(400).json({ error: 'Actividad y al menos dos letras del nombre son requeridas.' });
+  }
+
+  try {
+    const { sorteo, error, status } = await loadSorteoInscripcion(sorteoId);
+    if (error) return res.status(status).json({ error });
+    if (!sorteo.restringir_padron) {
+      return res.status(400).json({ error: 'Esta actividad no utiliza un listado previo.' });
+    }
+
+    const result = await pool.query(
+      `SELECT p.cedula, p.nombre
+       FROM sorteo_padron p
+       WHERE p.sorteo_id = $1
+         AND p.nombre ILIKE $2
+         AND NOT EXISTS (
+           SELECT 1 FROM inscripciones i
+           WHERE i.sorteo_id = p.sorteo_id AND i.cedula = p.cedula
+         )
+       ORDER BY p.nombre, p.cedula
+       LIMIT 10`,
+      [sorteo.id, `%${buscar}%`]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al buscar en el listado autorizado.' });
   }
 });
 

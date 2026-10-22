@@ -49,7 +49,9 @@ Al crear o editar un sorteo con inscripción pública se elige entre:
 - **Listado previo (padrón)** — solo cédulas presentes en el padrón. El listado se carga desde
   un archivo Excel/CSV: se detecta automáticamente la columna de cédula y la de nombre (o se
   asume columna A = cédula, columna B = nombre). Las cédulas se normalizan quitando espacios y
-  guiones, de modo que `1-1111-1111` y `111111111` se consideran la misma.
+  guiones, de modo que `1-1111-1111` y `111111111` se consideran la misma. En la ventana
+  pública aparece un buscador por nombre; solo muestra personas autorizadas que aún no se han
+  inscrito y, al seleccionar una, completa su nombre y cédula.
 
 ## 📊 Exportación de reportes
 

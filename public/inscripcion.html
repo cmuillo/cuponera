@@ -43,6 +43,16 @@
           <div id="inscAlert" class="d-none"></div>
 
           <form id="inscForm" autocomplete="off">
+            <div id="inscPadronSearchBox" class="mb-3 d-none">
+              <label class="form-label fw-semibold" for="inscPadronSearch">Búsquese por nombre</label>
+              <div class="position-relative">
+                <input type="search" id="inscPadronSearch" class="form-control"
+                       placeholder="Escriba al menos dos letras de su nombre" autocomplete="off" />
+                <div id="inscPadronResults" class="list-group position-absolute w-100 shadow d-none"
+                     style="z-index: 10;"></div>
+              </div>
+              <div class="form-text">Seleccione su nombre para completar la inscripción.</div>
+            </div>
             <div class="mb-3">
               <label class="form-label fw-semibold">Nombre completo *</label>
               <input type="text" id="inscNombre" class="form-control" maxlength="255" required />

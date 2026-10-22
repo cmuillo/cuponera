@@ -7,6 +7,7 @@ const Inscripcion = {
   config: { whatsapp_comprobantes: '', paquetes_cupones: [], compras_adicionales_habilitadas: true },
   cedulaVerificada: null,
   cedulaInscrita: null,
+  padronSearchTimer: null,
 
   async init() {
     const params = new URLSearchParams(location.search);
@@ -38,8 +39,13 @@ const Inscripcion = {
     }
 
     if (this.sorteo.restringir_padron) {
+      document.getElementById('inscPadronSearchBox').classList.remove('d-none');
       document.getElementById('inscPadronHint').innerHTML =
         '<i class="bi bi-shield-check me-1"></i>Esta actividad es solo para personas del listado autorizado. Su cédula será validada.';
+      document.getElementById('inscPadronSearch').addEventListener('input', (e) => {
+        clearTimeout(this.padronSearchTimer);
+        this.padronSearchTimer = setTimeout(() => this.buscarEnPadron(e.target.value), 250);
+      });
     }
 
     const acompCheck = document.getElementById('inscAcompanante');
@@ -79,6 +85,48 @@ const Inscripcion = {
     const el = document.getElementById('inscFatal');
     el.textContent = msg;
     el.classList.remove('d-none');
+  },
+
+  async buscarEnPadron(texto) {
+    const input = document.getElementById('inscPadronSearch');
+    const results = document.getElementById('inscPadronResults');
+    const termino = texto.trim();
+    results.classList.add('d-none');
+    results.innerHTML = '';
+    if (termino.length < 2) return;
+
+    try {
+      const personas = await this.get(
+        `/api/inscripciones/padron?sorteo_id=${this.sorteoId}&buscar=${encodeURIComponent(termino)}`
+      );
+      if (input.value.trim() !== termino) return;
+      if (personas.length === 0) {
+        results.innerHTML = '<div class="list-group-item text-muted small">No hay personas disponibles con ese nombre.</div>';
+      } else {
+        results.innerHTML = personas.map((persona, index) => `
+          <button type="button" class="list-group-item list-group-item-action"
+                  onclick="Inscripcion.seleccionarDelPadron(${index})">
+            ${escHtml(persona.nombre)}
+          </button>`).join('');
+      }
+      this.personasPadron = personas;
+      results.classList.remove('d-none');
+    } catch (err) {
+      if (input.value.trim() === termino) {
+        results.innerHTML = `<div class="list-group-item text-danger small">${escHtml(err.message)}</div>`;
+        results.classList.remove('d-none');
+      }
+    }
+  },
+
+  seleccionarDelPadron(index) {
+    const persona = this.personasPadron[index];
+    if (!persona) return;
+    document.getElementById('inscNombre').value = persona.nombre;
+    document.getElementById('inscCedula').value = persona.cedula;
+    document.getElementById('inscPadronSearch').value = persona.nombre;
+    document.getElementById('inscPadronResults').classList.add('d-none');
+    document.getElementById('inscCelular').focus();
   },
 
   // ---- TAB 1: INSCRIPCIÓN ----
