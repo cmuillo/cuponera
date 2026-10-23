@@ -47,7 +47,7 @@ const Inscripcion = {
     if (this.sorteo.restringir_padron) {
       document.getElementById('inscPadronSearchBox').classList.remove('d-none');
       document.getElementById('inscPadronHint').innerHTML =
-        '<i class="bi bi-shield-check me-1"></i>Esta actividad es solo para personas del listado autorizado. Su cédula será validada.';
+        '<i class="bi bi-shield-check me-1"></i>Esta actividad es solo para personas del listado autorizado. Su identificador será validado.';
       document.getElementById('inscPadronSearch').addEventListener('input', (e) => {
         clearTimeout(this.padronSearchTimer);
         this.padronSearchTimer = setTimeout(() => this.buscarEnPadron(e.target.value), 250);
@@ -203,7 +203,7 @@ const Inscripcion = {
           ${this.cuponesHtml(data.cupones)}
           <div class="alert alert-light border mt-3 text-start small mb-3">
             <div><strong>Nombre:</strong> ${escHtml(data.inscripcion.nombre)}</div>
-            <div><strong>Cédula:</strong> ${escHtml(data.inscripcion.cedula)}</div>
+            <div><strong>Identificador:</strong> ${escHtml(data.inscripcion.cedula)}</div>
             <div><strong>Teléfono:</strong> ${escHtml(data.inscripcion.celular)}</div>
             <div><strong>Acompañante:</strong> ${data.inscripcion.acompanante
               ? escHtml(data.inscripcion.acompanante_nombre) : 'No'}</div>
@@ -229,7 +229,7 @@ const Inscripcion = {
     const texto =
       `🧾 *Comprobante de reserva — ${data.sorteo.nombre}*\n\n` +
       `👤 ${reserva.nombre}\n` +
-      `🪪 Cédula: ${reserva.cedula}\n` +
+      `🪪 Identificador: ${reserva.cedula}\n` +
       `📱 Teléfono: ${reserva.celular}\n` +
       `👥 Espacios reservados: ${reserva.espacios_reservados}\n` +
       `💵 Monto: ₡${formatColones(reserva.monto_total)}\n\n` +
@@ -289,7 +289,7 @@ const Inscripcion = {
       if (!estado.inscrito) {
         alertEl.className = 'alert alert-warning';
         alertEl.innerHTML =
-          '<i class="bi bi-exclamation-triangle me-1"></i>Esta cédula aún no está inscrita. ' +
+          '<i class="bi bi-exclamation-triangle me-1"></i>Este identificador aún no está inscrito. ' +
           'Complete primero la pestaña <strong>Inscripción</strong>.';
         alertEl.classList.remove('d-none');
         this.cedulaVerificada = null;
@@ -378,7 +378,7 @@ const Inscripcion = {
     const texto =
       `🧾 *Comprobante de pago — ${data.sorteo.nombre}*\n\n` +
       `👤 ${data.inscripcion.nombre}\n` +
-      `🪪 Cédula: ${data.inscripcion.cedula}\n` +
+      `🪪 Identificador: ${data.inscripcion.cedula}\n` +
       `📱 Teléfono: ${data.inscripcion.celular}\n` +
       `💵 Monto: ₡${formatColones(data.paquete.monto)}\n` +
       `🎟️ Cupones generados (${data.cupones.length}):\n• ${data.cupones.map(c => c.codigo).join('\n• ')}\n\n` +

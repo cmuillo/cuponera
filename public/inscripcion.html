@@ -58,7 +58,7 @@
               <input type="text" id="inscNombre" class="form-control" maxlength="255" required />
             </div>
             <div class="mb-3">
-              <label class="form-label fw-semibold">Cédula * <span class="text-muted fw-normal small">Su cédula es un campo de referencia de uso interno.</span></label>
+              <label class="form-label fw-semibold">Identificador * <span class="text-muted fw-normal small">Su identificador es un campo de referencia de uso interno.</span></label>
               <input type="text" id="inscCedula" class="form-control" maxlength="25" placeholder="Ej: 112340567" required />
               <div class="form-text" id="inscPadronHint"></div>
             </div>
@@ -98,13 +98,13 @@
         <div class="tab-pane fade" id="tabCompra" role="tabpanel">
           <p class="text-muted small">
             <i class="bi bi-info-circle me-1"></i>
-            Para comprar cupones adicionales debe estar inscrito previamente. Ingrese su cédula para continuar.
+            Para comprar cupones adicionales debe estar inscrito previamente. Ingrese su identificador para continuar.
           </p>
 
           <div id="compraAlert" class="d-none"></div>
 
           <form id="compraVerifyForm" class="mb-3" autocomplete="off">
-            <label class="form-label fw-semibold">Cédula *</label>
+            <label class="form-label fw-semibold">Identificador *</label>
             <div class="input-group">
               <input type="text" id="compraCedula" class="form-control" maxlength="25" placeholder="Ej: 112340567" required />
               <button class="btn btn-outline-primary" type="submit" id="compraVerifyBtn">
